@@ -31,9 +31,7 @@ try {
     state.execution = state.execution || {};
     state.execution.last_stop_at = new Date().toISOString();
 
-    // Dreaming フックポイント (Managed Agents Research Preview 準備)
-    // Dreaming API 承認後にここでパターン抽出・記憶整理を実行する。
-    // 現時点では state.dreaming フィールドの初期化のみ行う。
+    // Dreaming フィールド初期化（初回のみ）
     if (!state.dreaming) {
       state.dreaming = {
         patterns: [],
@@ -46,6 +44,26 @@ try {
 
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
+
+    // Dreaming runner を非同期 spawn（dreaming_enabled = true のときのみ）
+    // dreaming_enabled は Claude Console でアクセス承認後に true に変更する。
+    if (state.dreaming.dreaming_enabled) {
+      try {
+        const { spawn } = require("child_process");
+        const runner = path.join(__dirname, "dreaming-runner.js");
+        if (fs.existsSync(runner)) {
+          const child = spawn(process.execPath, [runner], {
+            detached: true,
+            stdio: "ignore",
+            cwd: process.cwd(),
+          });
+          child.unref(); // 親プロセスの終了をブロックしない
+          console.log("[SessionEnd] Dreaming runner spawned (background)");
+        }
+      } catch (spawnErr) {
+        console.error(`[SessionEnd] Dreaming spawn failed: ${spawnErr.message}`);
+      }
+    }
   } else {
     console.log("[SessionEnd] state.json not found — skip");
   }
