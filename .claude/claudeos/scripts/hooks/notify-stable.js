@@ -99,6 +99,21 @@ function collectEvents(state) {
   return events;
 }
 
+// Webhook 通知を detached プロセスで非同期送信する（Stop hook をブロックしない）。
+function spawnWebhook(event, data) {
+  try {
+    const { spawn } = require("child_process");
+    const notifier = path.join(__dirname, "webhook-notifier.js");
+    if (!fs.existsSync(notifier)) return;
+    const child = spawn(
+      process.execPath,
+      [notifier, event, JSON.stringify(data)],
+      { detached: true, stdio: "ignore", cwd: process.cwd() }
+    );
+    child.unref();
+  } catch { /* fail-soft */ }
+}
+
 function run() {
   const state = readJson(STATE_FILE);
   if (!state) {
@@ -124,6 +139,13 @@ function run() {
   events.forEach((ev) => {
     if (ev.key === lastKey) return;
     send(notif.channel || "push", ev.title, ev.body);
+
+    // Webhook 通知: Push Notification と同じイベントを外部へ送信
+    const webhookEvent = ev.title === "STABLE 達成" ? "stable_achieved"
+                       : ev.title === "Blocked"     ? "ci_blocked"
+                       : "session_end";
+    spawnWebhook(webhookEvent, { title: ev.title, body: ev.body });
+
     state.notification.last_sent_event = ev.key;
     state.notification.last_sent_at = new Date().toISOString();
     updated = true;

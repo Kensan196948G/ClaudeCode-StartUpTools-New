@@ -64,6 +64,24 @@ try {
         console.error(`[SessionEnd] Dreaming spawn failed: ${spawnErr.message}`);
       }
     }
+
+    // Webhook: session_end イベントを外部へ通知（detached spawn）
+    try {
+      const { spawn } = require("child_process");
+      const notifier = path.join(__dirname, "webhook-notifier.js");
+      if (fs.existsSync(notifier)) {
+        const payload = JSON.stringify({
+          last_session_summary: (state.execution || {}).last_session_summary || null,
+          phase: (state.execution || {}).phase || null,
+        });
+        const child = spawn(process.execPath, [notifier, "session_end", payload], {
+          detached: true,
+          stdio: "ignore",
+          cwd: process.cwd(),
+        });
+        child.unref();
+      }
+    } catch { /* fail-soft */ }
   } else {
     console.log("[SessionEnd] state.json not found — skip");
   }

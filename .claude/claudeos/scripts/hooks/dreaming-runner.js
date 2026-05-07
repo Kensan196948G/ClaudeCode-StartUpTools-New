@@ -244,6 +244,26 @@ async function run() {
       console.log(`[Dreaming] Input store archived: ${store.id}`);
     } catch { /* fail-soft */ }
 
+    // Step 8: dream_complete イベントを Webhook 通知
+    try {
+      const { spawn } = require("child_process");
+      const notifier = path.join(__dirname, "webhook-notifier.js");
+      if (fs.existsSync(notifier)) {
+        const payload = JSON.stringify({
+          patterns_count:  extracted.patterns.length,
+          memories_count:  extracted.curated_memories.length,
+          mistakes_count:  extracted.recurring_mistakes.length,
+          dream_id:        dreamId,
+        });
+        const child = spawn(process.execPath, [notifier, "dream_complete", payload], {
+          detached: true,
+          stdio:    "ignore",
+          cwd:      PROJECT_ROOT,
+        });
+        child.unref();
+      }
+    } catch { /* fail-soft */ }
+
   } catch (err) {
     console.error(`[Dreaming] Error: ${err.message}`);
     // エラーを state.dreaming.last_error に記録
