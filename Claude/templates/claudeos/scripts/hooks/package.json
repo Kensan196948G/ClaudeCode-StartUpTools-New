@@ -1,0 +1,9 @@
+{
+  "name": "claudeos-hooks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ClaudeOS v8 hooks — @anthropic-ai/sdk is required for Dreaming runner",
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest"
+  }
+}
