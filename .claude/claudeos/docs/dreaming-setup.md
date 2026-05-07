@@ -25,7 +25,16 @@ https://claude.com/form/claude-managed-agents
 
 ---
 
-## Step 2: 有効化（承認後のみ実施）
+## Step 2: SDK インストール（承認後のみ実施）
+
+```bash
+cd .claude/claudeos/scripts/hooks
+npm install
+```
+
+`package.json` が配置済みのため、このコマンドで `@anthropic-ai/sdk` が自動インストールされる。
+
+## Step 3: 有効化（承認後のみ実施）
 
 `state.json` の `dreaming.dreaming_enabled` を `true` に変更する:
 

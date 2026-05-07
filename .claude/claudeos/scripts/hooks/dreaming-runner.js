@@ -1,27 +1,23 @@
 #!/usr/bin/env node
 // Dreaming Runner (ClaudeOS v8.3 — Managed Agents Research Preview)
-// セッション終了後に非同期 spawn され、パターン抽出結果を state.dreaming へ書き込む。
+// @anthropic-ai/sdk (TypeScript SDK) を使用した Dreams API 実装。
 //
 // 実行条件:
 //   state.dreaming.dreaming_enabled = true
 //   ANTHROPIC_API_KEY 環境変数が設定済み
+//   npm install 実行済み（このディレクトリで）
 //
 // アクセス申請: https://claude.com/form/claude-managed-agents
-// 有効化方法:  state.json の dreaming.dreaming_enabled を true に変更するだけ
-//
-// 依存: Node.js 内蔵 https モジュールのみ（npm install 不要）
+// 有効化: state.dreaming.dreaming_enabled を true に変更するだけ
 
 "use strict";
 
-const https = require("https");
 const fs = require("fs");
 const path = require("path");
 
 const PROJECT_ROOT = process.cwd();
 const STATE_FILE = path.join(PROJECT_ROOT, "state.json");
 
-const API_HOST = "api.anthropic.com";
-const API_VERSION = "2023-06-01";
 const BETA_HEADER = "managed-agents-2026-04-01,dreaming-2026-04-21";
 const POLL_INTERVAL_MS = 10000; // 10 秒
 const MAX_POLLS = 120;          // 最大 20 分
@@ -37,7 +33,7 @@ function readJson(file) {
 }
 
 function writeJsonAtomic(file, data) {
-  // session-end.js と同じ atomic write パターンで競合を回避する。
+  // session-end.js と同じ atomic write パターン（temp + rename）
   const tmp = `${file}.tmp.${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n", "utf8");
   fs.renameSync(tmp, file);
@@ -47,45 +43,9 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function apiRequest(method, urlPath, body, apiKey) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null;
-    const options = {
-      hostname: API_HOST,
-      port: 443,
-      path: urlPath,
-      method,
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": API_VERSION,
-        "anthropic-beta": BETA_HEADER,
-        "content-type": "application/json",
-        ...(payload ? { "content-length": Buffer.byteLength(payload) } : {}),
-      },
-    };
-    const req = https.request(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          resolve({ status: res.statusCode, body: JSON.parse(data) });
-        } catch {
-          resolve({ status: res.statusCode, body: data });
-        }
-      });
-    });
-    req.on("error", reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
-
-// ---------- コンテンツ生成 ----------
-
-// state.json の learning データから Memory Store に書き込む Markdown コンテンツを生成する。
+// state.json の learning データから Memory Store 用コンテンツを生成する。
 function buildSessionContent(state) {
-  const learning = state.learning || {};
-  const agents = (learning.usage_history || {}).agents || {};
+  const agents = ((state.learning || {}).usage_history || {}).agents || {};
   const exec = state.execution || {};
   const stable = state.stable || {};
   const dreaming = state.dreaming || {};
@@ -130,8 +90,6 @@ const INSTRUCTIONS = `
 {"patterns":["..."],"curated_memories":["..."],"recurring_mistakes":["..."]}
 `.trim();
 
-// ---------- 結果パース ----------
-
 function parseExtracted(raw) {
   const empty = { patterns: [], curated_memories: [], recurring_mistakes: [] };
   try {
@@ -158,7 +116,6 @@ async function run() {
   }
 
   const dreamingState = state.dreaming || {};
-
   if (!dreamingState.dreaming_enabled) {
     console.log("[Dreaming] dreaming_enabled = false — skip");
     console.log("[Dreaming] アクセス承認後に state.dreaming.dreaming_enabled を true に変更してください");
@@ -171,102 +128,97 @@ async function run() {
     return;
   }
 
-  console.log("[Dreaming] Starting pattern extraction (Managed Agents Research Preview)...");
+  // @anthropic-ai/sdk を動的ロード
+  let Anthropic;
+  try {
+    // SDK は hooks/ ディレクトリ内の node_modules を優先して探す
+    const sdkPath = path.join(__dirname, "node_modules", "@anthropic-ai", "sdk");
+    Anthropic = fs.existsSync(sdkPath)
+      ? require(sdkPath)
+      : require("@anthropic-ai/sdk");
+  } catch {
+    console.log("[Dreaming] @anthropic-ai/sdk not found");
+    console.log("[Dreaming] Run: cd .claude/claudeos/scripts/hooks && npm install");
+    return;
+  }
+
+  console.log("[Dreaming] Starting... (Managed Agents Research Preview)");
+
+  // SDK クライアント: defaultHeaders で全リクエストに beta header を付与
+  const client = new Anthropic({
+    apiKey,
+    defaultHeaders: { "anthropic-beta": BETA_HEADER },
+  });
 
   try {
+    const content = buildSessionContent(state);
+
     // Step 1: Memory Store 作成
-    const storeRes = await apiRequest("POST", "/v1/memory-stores", {
+    const store = await client.beta.memoryStores.create({
       name: `claudeos-${new Date().toISOString().slice(0, 10)}`,
       description: "ClaudeOS v8 session learning data for Dreaming",
-    }, apiKey);
+    });
+    console.log(`[Dreaming] Memory Store created: ${store.id}`);
 
-    if (storeRes.status !== 200 && storeRes.status !== 201) {
-      console.error(`[Dreaming] Memory Store creation failed: HTTP ${storeRes.status}`);
-      console.error("[Dreaming] Detail:", JSON.stringify(storeRes.body));
-      return;
-    }
-    const storeId = storeRes.body.id;
-    console.log(`[Dreaming] Memory Store created: ${storeId}`);
-
-    // Step 2: セッションデータを Memory Store に書き込み
-    const content = buildSessionContent(state);
-    const fileRes = await apiRequest("POST", `/v1/memory-stores/${storeId}/files`, {
+    // Step 2: セッションデータをファイルとして書き込み
+    await client.beta.memoryStores.files.create(store.id, {
       name: "session-learning.md",
       content,
-    }, apiKey);
-
-    if (fileRes.status !== 200 && fileRes.status !== 201) {
-      console.error(`[Dreaming] Memory Store file write failed: HTTP ${fileRes.status}`);
-      return;
-    }
+    });
     console.log("[Dreaming] Session data written to memory store");
 
     // Step 3: Dream 作成
-    const dreamRes = await apiRequest("POST", "/v1/dreams", {
-      inputs: [{ type: "memory_store", memory_store_id: storeId }],
+    const dream = await client.beta.dreams.create({
+      inputs: [{ type: "memory_store", memory_store_id: store.id }],
       model: "claude-opus-4-7",
       instructions: INSTRUCTIONS,
-    }, apiKey);
+    });
+    console.log(`[Dreaming] Dream created: ${dream.id} (status: ${dream.status})`);
 
-    if (dreamRes.status !== 200 && dreamRes.status !== 201) {
-      console.error(`[Dreaming] Dream creation failed: HTTP ${dreamRes.status}`);
-      console.error("[Dreaming] Detail:", JSON.stringify(dreamRes.body));
-      return;
-    }
-
-    const dreamId = dreamRes.body.id;
-    console.log(`[Dreaming] Dream created: ${dreamId} (status: ${dreamRes.body.status})`);
-
-    // dream_id を state.json に記録（再開可能にするため）
+    // dream_id を state.json に記録（プロセスが中断されても再確認できる）
     {
       const s = readJson(STATE_FILE);
       if (s) {
         s.dreaming = s.dreaming || {};
-        s.dreaming.current_dream_id = dreamId;
-        s.dreaming.current_dream_store_id = storeId;
+        s.dreaming.current_dream_id = dream.id;
+        s.dreaming.current_dream_store_id = store.id;
         s.dreaming.last_dreaming_run = new Date().toISOString();
         writeJsonAtomic(STATE_FILE, s);
       }
     }
 
     // Step 4: ポーリング（最大 MAX_POLLS × POLL_INTERVAL_MS）
-    let dream = dreamRes.body;
+    let current = dream;
     let polls = 0;
-    while ((dream.status === "pending" || dream.status === "running") && polls < MAX_POLLS) {
+    while ((current.status === "pending" || current.status === "running") && polls < MAX_POLLS) {
       await sleep(POLL_INTERVAL_MS);
-      const pollRes = await apiRequest("GET", `/v1/dreams/${dreamId}`, null, apiKey);
-      if (pollRes.status === 200) {
-        dream = pollRes.body;
-      }
+      current = await client.beta.dreams.retrieve(dream.id);
       polls++;
       if (polls % 6 === 0) {
-        console.log(`[Dreaming] Polling... status=${dream.status} (${Math.round(polls * POLL_INTERVAL_MS / 1000)}s elapsed)`);
+        console.log(`[Dreaming] Polling... status=${current.status} (${Math.round(polls * POLL_INTERVAL_MS / 1000)}s elapsed)`);
       }
     }
 
-    if (dream.status !== "completed") {
-      console.log(`[Dreaming] Dream ended with status: ${dream.status}`);
-      console.log(`[Dreaming] Dream ID を保存済み — 次回セッション開始時に再確認: ${dreamId}`);
+    if (current.status !== "completed") {
+      console.log(`[Dreaming] Dream ended: ${current.status} — Dream ID saved for follow-up: ${dream.id}`);
       return;
     }
 
     // Step 5: 出力 Memory Store からファイルを読み取り、結果をパース
-    const outputStore = (dream.outputs || []).find((o) => o.type === "memory_store");
+    const outputStore = (current.outputs || []).find((o) => o.type === "memory_store");
     if (!outputStore) {
       console.log("[Dreaming] No output memory store found in completed dream");
       return;
     }
 
     let extracted = { patterns: [], curated_memories: [], recurring_mistakes: [] };
-    const filesRes = await apiRequest("GET", `/v1/memory-stores/${outputStore.memory_store_id}/files`, null, apiKey);
-
-    if (filesRes.status === 200) {
-      for (const f of filesRes.body.data || []) {
-        const fr = await apiRequest("GET", `/v1/memory-stores/${outputStore.memory_store_id}/files/${f.id}`, null, apiKey);
-        if (fr.status === 200) {
-          const parsed = parseExtracted(fr.body.content || "");
-          if (parsed.patterns.length > 0) extracted = parsed;
-        }
+    const { data: files } = await client.beta.memoryStores.files.list(outputStore.memory_store_id);
+    for (const f of files || []) {
+      const file = await client.beta.memoryStores.files.retrieve(outputStore.memory_store_id, f.id);
+      const parsed = parseExtracted(file.content || "");
+      if (parsed.patterns.length > 0) {
+        extracted = parsed;
+        break;
       }
     }
 
@@ -288,11 +240,9 @@ async function run() {
 
     // Step 7: 入力 Memory Store を後片付け（エラーは無視）
     try {
-      await apiRequest("POST", `/v1/memory-stores/${storeId}/archive`, {}, apiKey);
-      console.log(`[Dreaming] Input store archived: ${storeId}`);
-    } catch {
-      // fail-soft: アーカイブ失敗はスキップ
-    }
+      await client.beta.memoryStores.archive(store.id);
+      console.log(`[Dreaming] Input store archived: ${store.id}`);
+    } catch { /* fail-soft */ }
 
   } catch (err) {
     console.error(`[Dreaming] Error: ${err.message}`);

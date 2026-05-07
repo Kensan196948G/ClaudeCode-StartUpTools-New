@@ -1,0 +1,12 @@
+{
+  "name": "claudeos-hooks",
+  "version": "1.0.0",
+  "description": "ClaudeOS v8 session hooks — Dreaming integration",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest"
+  }
+}
