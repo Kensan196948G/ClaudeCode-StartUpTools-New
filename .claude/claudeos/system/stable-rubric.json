@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "ClaudeOS v8 STABLE判定 rubric — Outcomes 統合用。CLAUDE.md §9 の条件を machine-readable 化した単一真実のソース。",
+  "updated": "2026-05-07",
+  "scoring": {
+    "pass_threshold": 1.0,
+    "mode": "all_required",
+    "note": "required:true の全項目が pass のときのみ STABLE 合格。1項目でも fail → 不合格。"
+  },
+  "criteria": [
+    {
+      "id": "test",
+      "label": "テスト成功",
+      "required": true,
+      "weight": 1.0,
+      "check": "unit tests + integration tests が全て pass",
+      "evidence": "CI テストレポート または ローカル test 出力",
+      "skip_if": null
+    },
+    {
+      "id": "ci",
+      "label": "CI 成功",
+      "required": true,
+      "weight": 1.0,
+      "check": "GitHub Actions / CI パイプラインが green",
+      "evidence": "gh run list または CI ステータス URL",
+      "skip_if": null
+    },
+    {
+      "id": "lint",
+      "label": "Lint 成功",
+      "required": true,
+      "weight": 1.0,
+      "check": "lint エラー件数 = 0",
+      "evidence": "lint 出力ログ",
+      "skip_if": null
+    },
+    {
+      "id": "build",
+      "label": "Build 成功",
+      "required": true,
+      "weight": 1.0,
+      "check": "ビルドがエラーなく完了",
+      "evidence": "build 出力ログ",
+      "skip_if": null
+    },
+    {
+      "id": "error_count",
+      "label": "ランタイムエラー件数ゼロ",
+      "required": true,
+      "weight": 1.0,
+      "check": "ランタイムログのエラー件数 = 0",
+      "evidence": "ランタイムエラースキャン結果",
+      "skip_if": null
+    },
+    {
+      "id": "security",
+      "label": "セキュリティ問題ゼロ",
+      "required": true,
+      "weight": 1.0,
+      "check": "security-reviewer から blocking 指摘なし",
+      "evidence": "security-reviewer 出力",
+      "skip_if": null
+    },
+    {
+      "id": "review",
+      "label": "レビュー OK",
+      "required": true,
+      "weight": 1.0,
+      "check": "CodeRabbit Critical/High 指摘なし かつ Codex review 承認 または blocking コメントなし",
+      "evidence": "CodeRabbit レポート + Codex review 結果",
+      "skip_if": null
+    },
+    {
+      "id": "gate1",
+      "label": "Gate-1 実行済み",
+      "required": true,
+      "weight": 1.0,
+      "check": "webui-full-verification-checklist.md の Gate-1 必須項目を実行済み",
+      "evidence": "Verify フェーズ終了報告の '実行した検証' 区分",
+      "skip_if": "UI / API への変更が今回のイテレーションに含まれない"
+    },
+    {
+      "id": "gate2",
+      "label": "Gate-2 実行済み",
+      "required": false,
+      "weight": 1.0,
+      "condition": "PR 作成直前ステップのみ必須",
+      "check": "webui-full-verification-checklist.md の Gate-2 必須項目を実行済み",
+      "evidence": "PR 作成前の終了報告",
+      "skip_if": "PR 作成ステップでない"
+    }
+  ],
+  "consecutive_success": {
+    "small": 2,
+    "normal": 3,
+    "important": 5,
+    "examples": {
+      "small": "コメント修正・軽微な修正",
+      "normal": "機能追加・バグ修正",
+      "important": "認証・セキュリティ・DB 変更"
+    }
+  },
+  "self_correction": {
+    "max_repair_rounds": 15,
+    "same_error_block_threshold": 3,
+    "note": "Outcomes self-correction loop — CLAUDE.md §12 Auto Repair 制御と統合。上限到達時は残指摘を Issue に起票して次フェーズへ進む。"
+  },
+  "references": {
+    "source_of_truth": "CLAUDE.md §9",
+    "gate_checklist": "Claude/templates/claudeos/docs/webui-full-verification-checklist.md",
+    "grader_agent": ".claude/claudeos/agents/outcome-grader.md"
+  }
+}

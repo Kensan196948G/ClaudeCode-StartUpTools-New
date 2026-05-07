@@ -30,6 +30,20 @@ try {
   if (state) {
     state.execution = state.execution || {};
     state.execution.last_stop_at = new Date().toISOString();
+
+    // Dreaming フックポイント (Managed Agents Research Preview 準備)
+    // Dreaming API 承認後にここでパターン抽出・記憶整理を実行する。
+    // 現時点では state.dreaming フィールドの初期化のみ行う。
+    if (!state.dreaming) {
+      state.dreaming = {
+        patterns: [],
+        curated_memories: [],
+        recurring_mistakes: [],
+        last_dreaming_run: null,
+        dreaming_enabled: false,
+      };
+    }
+
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
   } else {
