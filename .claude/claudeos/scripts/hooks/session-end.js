@@ -3,6 +3,10 @@
 // セッション終了時に state.json を最終更新し、続けて notify-stable を同期実行する。
 // 並列実行による state.json への race condition を避けるため、両者は単一 hook エントリに統合する。
 // 失敗しても Stop hook をブロックしない fail-soft 設計。
+//
+// 実行順序: state.json 更新 → Webhook → notify-stable → Dreaming spawn
+// Dreaming spawn は notify-stable の state.json 書き込みが完了してから行う。
+// これにより dreaming runner が読む state.json に notify-stable の変更が反映される。
 
 const fs = require("fs");
 const path = require("path");
@@ -25,6 +29,8 @@ function writeJsonAtomic(file, data) {
   fs.renameSync(tmp, file);
 }
 
+let dreamingEnabled = false;
+
 try {
   const state = readJson(STATE_FILE);
   if (state) {
@@ -42,28 +48,10 @@ try {
       };
     }
 
+    dreamingEnabled = !!state.dreaming.dreaming_enabled;
+
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
-
-    // Dreaming runner を非同期 spawn（dreaming_enabled = true のときのみ）
-    // dreaming_enabled は Claude Console でアクセス承認後に true に変更する。
-    if (state.dreaming.dreaming_enabled) {
-      try {
-        const { spawn } = require("child_process");
-        const runner = path.join(__dirname, "dreaming-runner.js");
-        if (fs.existsSync(runner)) {
-          const child = spawn(process.execPath, [runner], {
-            detached: true,
-            stdio: "ignore",
-            cwd: process.cwd(),
-          });
-          child.unref(); // 親プロセスの終了をブロックしない
-          console.log("[SessionEnd] Dreaming runner spawned (background)");
-        }
-      } catch (spawnErr) {
-        console.error(`[SessionEnd] Dreaming spawn failed: ${spawnErr.message}`);
-      }
-    }
 
     // Webhook: session_end イベントを外部へ通知（detached spawn）
     try {
@@ -89,7 +77,8 @@ try {
   console.error(`[SessionEnd] state update failed: ${err.message}`);
 }
 
-// 続けて notify-stable を同期実行する。失敗しても Stop hook をブロックしない。
+// notify-stable を同期実行する（state.json への書き込みが完了してから）。
+// 失敗しても Stop hook をブロックしない。
 try {
   const notify = require("./notify-stable.js");
   if (notify && typeof notify.run === "function") {
@@ -97,6 +86,26 @@ try {
   }
 } catch (err) {
   console.error(`[SessionEnd] notify-stable failed: ${err.message}`);
+}
+
+// Dreaming runner を spawn する。notify-stable の state.json 書き込み完了後に
+// 起動することで、dreaming runner が stale な state を上書きするリスクを排除する。
+if (dreamingEnabled) {
+  try {
+    const { spawn } = require("child_process");
+    const runner = path.join(__dirname, "dreaming-runner.js");
+    if (fs.existsSync(runner)) {
+      const child = spawn(process.execPath, [runner], {
+        detached: true,
+        stdio: "ignore",
+        cwd: process.cwd(),
+      });
+      child.unref(); // 親プロセスの終了をブロックしない
+      console.log("[SessionEnd] Dreaming runner spawned (background)");
+    }
+  } catch (spawnErr) {
+    console.error(`[SessionEnd] Dreaming spawn failed: ${spawnErr.message}`);
+  }
 }
 
 process.exit(0);

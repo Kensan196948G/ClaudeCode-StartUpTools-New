@@ -65,11 +65,14 @@ function collectEvents(state) {
     notif.blocked &&
     (codex.severity === "high" || (codex.blocking_issues || []).length > 0)
   ) {
-    events.push({
-      key: "blocked_" + JSON.stringify(codex.blocking_issues || []),
-      title: "Blocked",
-      body: `severity=${codex.severity}, issues=${(codex.blocking_issues || []).length}`,
-    });
+    const blockedKey = "blocked_" + JSON.stringify(codex.blocking_issues || []);
+    if (notif.last_sent_event !== blockedKey) {
+      events.push({
+        key: blockedKey,
+        title: "Blocked",
+        body: `severity=${codex.severity}, issues=${(codex.blocking_issues || []).length}`,
+      });
+    }
   }
 
   if (

@@ -253,7 +253,7 @@ async function run() {
           patterns_count:  extracted.patterns.length,
           memories_count:  extracted.curated_memories.length,
           mistakes_count:  extracted.recurring_mistakes.length,
-          dream_id:        dreamId,
+          dream_id:        dream.id,
         });
         const child = spawn(process.execPath, [notifier, "dream_complete", payload], {
           detached: true,
