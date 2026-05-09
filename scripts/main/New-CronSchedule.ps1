@@ -439,7 +439,10 @@ function Invoke-CronTest {
             '-File', $watchScript,
             '-WithSessionInfoTab'
         )
-        $wtProfileName = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { 'AI CLI Startup' }
+        $wtProfileName = if (
+            ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+            ($Config.windowsTerminal.PSObject.Properties.Name -contains 'profileName') -and $Config.windowsTerminal.profileName
+        ) { [string]$Config.windowsTerminal.profileName } else { 'AI CLI Startup' }
         $profileArgs = @('-p', $wtProfileName)
         $wtArgs = @('-w', '0', 'new-tab') + $profileArgs + @('--title', 'Claude-Live-Log', '--', $psExe) + $psArgs
         Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgs -WindowStyle Hidden

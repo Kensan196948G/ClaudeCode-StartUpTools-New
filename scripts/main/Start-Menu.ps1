@@ -374,7 +374,10 @@ while ($true) {
         "5"  { Invoke-MenuScript -File "scripts\test\Test-AllTools.ps1" }
         "6"  { Invoke-MenuScript -File "scripts\test\test-drive-mapping.ps1" }
         "7"  {
-            $wtBgImage = if ($Config.windowsTerminal -and $Config.windowsTerminal.backgroundImage) { $Config.windowsTerminal.backgroundImage } else { '' }
+            $wtBgImage = if (
+                ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+                ($Config.windowsTerminal.PSObject.Properties.Name -contains 'backgroundImage') -and $Config.windowsTerminal.backgroundImage
+            ) { [string]$Config.windowsTerminal.backgroundImage } else { '' }
             $setupArgs = if (-not [string]::IsNullOrWhiteSpace($wtBgImage)) { @('-BackgroundImage', $wtBgImage) } else { @() }
             Invoke-MenuScript -File "scripts\setup\setup-windows-terminal.ps1" -ScriptArgs $setupArgs
         }

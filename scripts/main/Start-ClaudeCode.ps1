@@ -220,7 +220,10 @@ try {
     }
 
     # --- WT Profile 環境変数: Watch-ClaudeLog / Session Info タブに伝搬 ---
-    $wtProfileForSession = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { '' }
+    $wtProfileForSession = if (
+        ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+        ($Config.windowsTerminal.PSObject.Properties.Name -contains 'profileName') -and $Config.windowsTerminal.profileName
+    ) { [string]$Config.windowsTerminal.profileName } else { '' }
     if (-not [string]::IsNullOrWhiteSpace($wtProfileForSession)) {
         $env:AI_STARTUP_WT_PROFILE = $wtProfileForSession
     }
@@ -248,7 +251,10 @@ try {
                 if (-not [string]::IsNullOrWhiteSpace($sessionsDir)) {
                     $tabArgs += @('-SessionsDir', $sessionsDir)
                 }
-                $wtProfileName = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { '' }
+                $wtProfileName = if (
+                    ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+                    ($Config.windowsTerminal.PSObject.Properties.Name -contains 'profileName') -and $Config.windowsTerminal.profileName
+                ) { [string]$Config.windowsTerminal.profileName } else { '' }
                 if (-not [string]::IsNullOrWhiteSpace($wtProfileName)) {
                     $tabArgs += @('-WtProfile', $wtProfileName)
                 }
