@@ -326,3 +326,63 @@ else
 fi
 "@
 }
+
+<#
+.SYNOPSIS
+    Repairs missing hook scripts for all Linux projects via SSH.
+    Copies hooks from the canonical ClaudeCode-StartUpTools-New project to any
+    project that is missing session-end.js in its .claude/claudeos/scripts/hooks/ dir.
+    Also repairs sub-directories that contain .claude/claudeos/scripts/hooks/ references.
+#>
+function Repair-RemoteProjectHooks {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Remote repair operation; ShouldProcess would require interactive prompts incompatible with automated runs')]
+    param(
+        [Parameter(Mandatory)]
+        [string]$LinuxHost,
+        [Parameter(Mandatory)]
+        [string]$LinuxUser,
+        [Parameter(Mandatory)]
+        [string]$LinuxProjectsBase,
+        [string]$SshOptions = '-o BatchMode=yes -o ConnectTimeout=10'
+    )
+
+    $remoteScript = @'
+BASE="$1"
+CANONICAL="$BASE/ClaudeCode-StartUpTools-New/.claude/claudeos/scripts/hooks"
+if [ ! -d "$CANONICAL" ]; then
+  echo "[WARN] Canonical hooks source not found: $CANONICAL"
+  exit 1
+fi
+echo "[Repair-RemoteProjectHooks] Canonical source: $CANONICAL"
+echo ""
+
+# Find all .claude dirs (project root and subdirs) missing session-end.js
+find "$BASE" -name "settings.json" -path "*/.claude/settings.json" 2>/dev/null | while read -r settings_file; do
+  claude_dir="$(dirname "$settings_file")"
+  hooks_dir="$claude_dir/claudeos/scripts/hooks"
+
+  # Skip if this is the canonical source itself
+  if [ "$hooks_dir" = "$CANONICAL" ]; then
+    continue
+  fi
+
+  # Only repair if settings.json has hook references to session-end.js
+  if grep -q "session-end\|SessionStart\|PreCompact\|PostToolUse\|Stop" "$settings_file" 2>/dev/null; then
+    if [ ! -f "$hooks_dir/session-end.js" ]; then
+      mkdir -p "$hooks_dir"
+      cp -r "$CANONICAL"/. "$hooks_dir/"
+      echo "[OK] Repaired: $hooks_dir"
+    else
+      echo "[OK] Already OK: $hooks_dir"
+    fi
+  fi
+done
+echo ""
+echo "[Repair-RemoteProjectHooks] Done."
+'@
+
+    $remoteScriptEncoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($remoteScript))
+    $sshCmd = "bash <(echo '$remoteScriptEncoded' | base64 -d) '$LinuxProjectsBase'"
+    $result = & ssh ($SshOptions -split ' ') "$LinuxUser@$LinuxHost" $sshCmd 2>&1
+    $result | ForEach-Object { Write-Host $_ }
+}

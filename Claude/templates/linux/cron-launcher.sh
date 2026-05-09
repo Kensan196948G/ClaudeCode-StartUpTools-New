@@ -143,6 +143,26 @@ export LANG=C.UTF-8 LC_ALL=C.UTF-8
 export CLAUDE_SESSION_ID="$SESSION_ID"
 export CLAUDE_PROJECT="$PROJECT"
 
+# Set CLAUDEOS_HOOKS_DIR to the absolute project hooks path.
+# Hook commands in settings.json can reference this env var so they resolve
+# correctly even when Claude Code is started from a subdirectory.
+export CLAUDEOS_HOOKS_DIR="$PROJECT_DIR/.claude/claudeos/scripts/hooks"
+
+# Auto-repair: ensure hook scripts exist before Claude launch.
+# Canonical source is ClaudeCode-StartUpTools-New (always contains the latest hooks).
+# This handles projects set up before hooks were added to the template and
+# prevents MODULE_NOT_FOUND Stop hook errors on session end.
+_CANONICAL_HOOKS="$PROJECTS_BASE/ClaudeCode-StartUpTools-New/.claude/claudeos/scripts/hooks"
+if [ ! -f "$CLAUDEOS_HOOKS_DIR/session-end.js" ]; then
+  if [ -d "$_CANONICAL_HOOKS" ]; then
+    mkdir -p "$CLAUDEOS_HOOKS_DIR"
+    cp -r "$_CANONICAL_HOOKS"/. "$CLAUDEOS_HOOKS_DIR/"
+    echo "[cron-launcher] hooks auto-repaired from canonical source for $PROJECT" >> "$LOG_FILE"
+  else
+    echo "[cron-launcher] WARN: hooks missing at $CLAUDEOS_HOOKS_DIR and canonical source not found" >> "$LOG_FILE"
+  fi
+fi
+
 # P1-4: state.json からセッション状態を復元してクロンセッションに引き継ぐ
 STATE_FILE="$PROJECT_DIR/state.json"
 RESUME_PHASE="Monitor"
