@@ -24,14 +24,15 @@
     },
     "project": {
       "type": "object",
-      "description": "Project timeline constraints. release_deadline is MANDATORY (6 months from registration_date).",
+      "description": "Project timeline constraints. Release timing is determined by CTO judgment (deploy.ready=true). 6 months is a default guideline only, not a hard constraint.",
       "properties": {
         "registration_date": { "type": ["string", "null"], "format": "date" },
         "release_deadline": { "type": ["string", "null"], "format": "date" },
         "release_deadline_note": { "type": "string" },
-        "duration_months": { "type": "integer", "minimum": 1 },
+        "duration_months": { "type": ["integer", "null"], "minimum": 1, "description": "開発期間の目安（月）。CTO判断で無期限の場合は null を設定可" },
         "cron_enabled": { "type": "boolean" },
-        "session_max_minutes": { "type": "integer", "minimum": 1, "maximum": 300 }
+        "session_max_minutes": { "type": "integer", "minimum": 1, "maximum": 300 },
+        "phase_mode": { "type": "string", "enum": ["development", "maintenance", "released"], "description": "development=開発中 / maintenance=リリース後保守フェーズ / released=デプロイ完了・保守移行済み" }
       }
     },
     "kpi": {
@@ -53,7 +54,7 @@
         "remaining_minutes": { "type": "number", "minimum": 0 },
         "phase": {
           "type": "string",
-          "enum": ["Idle", "Monitor", "Development", "Verify", "Improvement", "Repair", "Release"]
+          "enum": ["Idle", "Monitor", "Development", "Verify", "Improvement", "Repair", "Release", "Maintenance", "Triage"]
         },
         "auto_stop_threshold": { "type": "integer", "minimum": 1 },
         "graceful_shutdown": { "type": "boolean" },
@@ -297,7 +298,7 @@
         "last_fix_scope": { "type": ["string", "null"] },
         "last_fix_strategy": { "type": ["string", "null"] },
         "flaky_suspected": { "type": "boolean" },
-        "debug_mode": { "type": "boolean" }
+        "debug_mode": { "type": ["string", "boolean"] }
       }
     },
     "onboarding": {
@@ -314,6 +315,46 @@
         "stop_doing_review_interval_days": { "type": "integer", "minimum": 1 },
         "stop_doing_last_run": { "type": ["string", "null"], "format": "date-time" },
         "stop_doing_candidates_found": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "maintenance": {
+      "type": "object",
+      "description": "Post-release maintenance phase configuration. Activated when project.phase_mode = 'maintenance'.",
+      "properties": {
+        "phase_mode": { "type": "string", "enum": ["development", "maintenance"] },
+        "released_at": { "type": ["string", "null"], "format": "date-time" },
+        "sla_target_availability": { "type": "number", "minimum": 0, "maximum": 1, "description": "SLA availability target (e.g. 0.995 = 99.5%)" },
+        "mttr_target_hours": { "type": "number", "minimum": 0, "description": "Mean Time To Recovery target in hours" },
+        "session_max_minutes": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Max session length in maintenance mode (default 120)" },
+        "cron_schedule": { "type": "string", "enum": ["daily", "weekly", "biweekly", "monthly"], "description": "Maintenance session frequency" },
+        "error_budget_remaining_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "last_dependency_scan": { "type": ["string", "null"], "format": "date-time" },
+        "last_security_audit": { "type": ["string", "null"], "format": "date-time" },
+        "last_weekly_devops": { "type": ["string", "null"], "format": "date-time" },
+        "last_monthly_devops": { "type": ["string", "null"], "format": "date-time" },
+        "last_quarterly_review": { "type": ["string", "null"], "format": "date-time" },
+        "incident_count_30d": { "type": "integer", "minimum": 0 },
+        "open_incidents": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Active incident IDs (e.g. ['incident-20261022-P1'])"
+        },
+        "last_incident_id": { "type": ["string", "null"] }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "description": "Deployment tracking. CTO sets ready=true when system is deploy-ready. Actual deploy is executed manually by the user.",
+      "properties": {
+        "ready": { "type": "boolean", "description": "CTO sets true when deployment is approved" },
+        "runbook_generated": { "type": "boolean" },
+        "runbook_path": { "type": ["string", "null"], "description": "Path to generated deploy runbook (e.g. reports/deploy-runbook-YYYYMMDD.md)" },
+        "pre_deploy_checklist_done": { "type": "boolean" },
+        "executed_at": { "type": ["string", "null"], "format": "date-time", "description": "Timestamp of manual deploy execution by user" },
+        "executed_by": { "type": ["string", "null"] },
+        "environment": { "type": ["string", "null"], "enum": ["staging", "production", null] },
+        "post_deploy_verified": { "type": "boolean" },
+        "notes": { "type": "string" }
       }
     }
   }

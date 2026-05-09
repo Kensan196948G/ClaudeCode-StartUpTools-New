@@ -1,0 +1,156 @@
+name: Quarterly Architecture Review
+
+on:
+  schedule:
+    # 3/6/9/12月の1日 03:00 JST (UTC+9 = 18:00 UTC 前日)
+    - cron: '0 18 28-31 2,5,8,11 *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-quarter:
+    name: Run only on 1st of quarter months
+    runs-on: ubuntu-latest
+    outputs:
+      is_quarter: ${{ steps.quarter_check.outputs.is_quarter }}
+      quarter: ${{ steps.quarter_check.outputs.quarter }}
+    steps:
+      - name: Check if today is 1st of a quarter month
+        id: quarter_check
+        run: |
+          MONTH=$(date -u +%m)
+          DAY=$(date -u +%d)
+          YEAR=$(date -u +%Y)
+          QUARTER="Q?"
+          IS_QUARTER="false"
+          if [ "$DAY" = "01" ]; then
+            case "$MONTH" in
+              03) IS_QUARTER="true"; QUARTER="Q1" ;;
+              06) IS_QUARTER="true"; QUARTER="Q2" ;;
+              09) IS_QUARTER="true"; QUARTER="Q3" ;;
+              12) IS_QUARTER="true"; QUARTER="Q4" ;;
+            esac
+          fi
+          echo "is_quarter=$IS_QUARTER" >> "$GITHUB_OUTPUT"
+          echo "quarter=${YEAR}-${QUARTER}" >> "$GITHUB_OUTPUT"
+
+  architecture-health:
+    name: Architecture Health Check
+    needs: check-quarter
+    if: ${{ needs.check-quarter.outputs.is_quarter == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Validate all JSON configs
+        run: |
+          echo "=== Quarterly Config Validation ==="
+          for f in state.json state.json.example config/config.json config/config.json.template; do
+            if [ -f "$f" ]; then
+              node -e "JSON.parse(require('fs').readFileSync('$f','utf8')); console.log('OK: $f')" 2>&1 || echo "FAIL: $f"
+            fi
+          done
+
+      - name: Check deprecated items in state.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('state.json','utf8'));
+          const candidates = data.frontier?.last_deprecation_candidates ?? [];
+          const lowUsage = data.frontier?.last_low_usage_items ?? [];
+          console.log('=== Deprecation Candidates ===');
+          candidates.forEach(c => console.log(' -', c));
+          console.log('=== Low Usage Items ===');
+          lowUsage.forEach(i => console.log(' -', i));
+          if (candidates.length + lowUsage.length === 0) {
+            console.log('(none found)');
+          }
+          " 2>&1
+
+      - name: Check major dependency updates available
+        run: npm outdated --long 2>/dev/null | head -30 || true
+
+  create-quarterly-issue:
+    name: Create Quarterly Review Issue
+    needs: [check-quarter, architecture-health]
+    if: ${{ (needs.check-quarter.outputs.is_quarter == 'true' || github.event_name == 'workflow_dispatch') && needs.architecture-health.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Create quarterly review checklist issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const quarter = '${{ needs.check-quarter.outputs.quarter }}' || 'Manual';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[Quarterly Review] ${quarter} アーキテクチャ・保守レビュー`,
+              body: `## 四半期レビュー: ${quarter}
+
+            **実施日**: ${new Date().toISOString().split('T')[0]}
+            **Workflow**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            ---
+
+            ## チェックリスト（人間サインオフ必須）
+
+            ### アーキテクチャ
+            - [ ] 主要コンポーネントの責務が明確か確認
+            - [ ] 技術的負債の棚卸し
+            - [ ] 廃止候補 (`frontier.last_deprecation_candidates`) の最終判断
+
+            ### 依存関係
+            - [ ] major バージョンアップの要否判断
+            - [ ] EOL（サポート終了）パッケージの確認
+            - [ ] Node.js バージョンの最新化検討
+
+            ### セキュリティ
+            - [ ] 月次セキュリティレポートの振り返り
+            - [ ] アクセス権限・GitHub Secrets の棚卸し
+            - [ ] CLAUDE.md / state.json の設定値見直し
+
+            ### 保守KPI振り返り
+            - [ ] SLA稼働率の実績確認
+            - [ ] MTTR（平均復旧時間）の実績確認
+            - [ ] Error Budget 残量の確認
+
+            ### 次四半期計画
+            - [ ] 主要機能追加・改善の優先順位付け
+            - [ ] cron スケジュール・セッション設定の見直し
+
+            ---
+            **このIssueはQuarterly Review Workflowによって自動生成されました。人間による確認・クローズが必要です。**`,
+              labels: ['maintenance', 'quarterly-review', 'human-required'],
+            });
+
+  quarterly-summary:
+    name: Quarterly Summary
+    needs: [check-quarter, architecture-health, create-quarterly-issue]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Summary
+        run: |
+          QUARTER="${{ needs.check-quarter.outputs.quarter }}"
+          echo "## Quarterly Architecture Review - ${QUARTER}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| ジョブ | 状態 |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| Architecture Health | ${{ needs.architecture-health.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Create Review Issue | ${{ needs.create-quarterly-issue.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> 人間によるサインオフが必要です。自動生成されたIssueを確認してください。" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**次回実行**: 翌四半期1日 03:00 JST" >> $GITHUB_STEP_SUMMARY

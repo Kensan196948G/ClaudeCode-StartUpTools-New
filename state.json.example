@@ -6,8 +6,8 @@
   "project": {
     "registration_date": null,
     "release_deadline": null,
-    "release_deadline_note": "Set to 6 months after registration_date. Format: ISO8601 (e.g. 2026-10-23). This deadline is MANDATORY.",
-    "duration_months": 6,
+    "release_deadline_note": "CTO判断でリリースタイミングを決定する。6か月はデフォルト目安のみ。deploy.ready=true → 手順書生成 → 手動デプロイ → maintenance.phase_mode=maintenance。",
+    "duration_months": null,
     "cron_enabled": true,
     "session_max_minutes": 300
   },
@@ -184,5 +184,33 @@
       "claudeos/system/loop-guard.md",
       "claudeos/system/token-budget.md"
     ]
+  },
+  "maintenance": {
+    "phase_mode": "development",
+    "released_at": null,
+    "sla_target_availability": 0.995,
+    "mttr_target_hours": 4,
+    "session_max_minutes": 120,
+    "cron_schedule": "weekly",
+    "error_budget_remaining_pct": 100,
+    "last_dependency_scan": null,
+    "last_security_audit": null,
+    "last_weekly_devops": null,
+    "last_monthly_devops": null,
+    "last_quarterly_review": null,
+    "incident_count_30d": 0,
+    "open_incidents": [],
+    "last_incident_id": null
+  },
+  "deploy": {
+    "ready": false,
+    "runbook_generated": false,
+    "runbook_path": null,
+    "pre_deploy_checklist_done": false,
+    "executed_at": null,
+    "executed_by": null,
+    "environment": null,
+    "post_deploy_verified": false,
+    "notes": ""
   }
 }

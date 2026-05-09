@@ -1,0 +1,101 @@
+name: Weekly DevOps
+
+on:
+  schedule:
+    # 毎週月曜 09:00 JST (UTC+9 = 00:00 UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: '手動実行の理由'
+        required: false
+        default: 'manual trigger'
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: npm audit
+        run: npm audit --audit-level=moderate || true
+
+      - name: Check for high/critical vulnerabilities
+        id: vuln_check
+        run: |
+          RESULT=$(npm audit --json 2>/dev/null || echo '{"metadata":{"vulnerabilities":{"high":0,"critical":0}}}')
+          HIGH=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('metadata',{}).get('vulnerabilities',{}).get('high',0))" 2>/dev/null || echo 0)
+          CRITICAL=$(echo "$RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('metadata',{}).get('vulnerabilities',{}).get('critical',0))" 2>/dev/null || echo 0)
+          echo "high=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
+          echo "Vulnerabilities - High: $HIGH, Critical: $CRITICAL"
+
+      - name: Create issue if critical vulnerability found
+        if: ${{ steps.vuln_check.outputs.critical > 0 }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '[P1][Security] Critical npm vulnerability detected - Weekly DevOps',
+              body: '## 自動検知: npm 重大脆弱性\n\n**検知日**: ' + new Date().toISOString() + '\n**Critical件数**: ${{ steps.vuln_check.outputs.critical }}\n**High件数**: ${{ steps.vuln_check.outputs.high }}\n\n### 対応手順\n1. `npm audit` で詳細確認\n2. `npm audit fix` で自動修正を試みる\n3. 修正不可の場合は代替パッケージを検討\n\n### 参照\n- Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n**このIssueはWeekly DevOps Workflowによって自動生成されました。**',
+              labels: ['security', 'P1', 'maintenance'],
+            });
+
+  ci-health-check:
+    name: CI Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate state.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          try {
+            const data = JSON.parse(fs.readFileSync('state.json','utf8'));
+            const mode = data.maintenance?.phase_mode ?? 'development';
+            console.log('phase_mode:', mode);
+            console.log('execution.phase:', data.execution?.phase);
+            console.log('stable_achieved:', data.stable?.stable_achieved);
+            console.log('error_budget_remaining_pct:', data.maintenance?.error_budget_remaining_pct ?? 'N/A');
+            console.log('open_incidents:', JSON.stringify(data.maintenance?.open_incidents ?? []));
+          } catch(e) { console.error('state.json parse error:', e.message); process.exit(1); }
+          "
+
+      - name: Validate state.schema.json
+        run: node scripts/validate-state-example.js
+
+  devops-summary:
+    name: Weekly DevOps Summary
+    needs: [dependency-audit, ci-health-check]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Generate Summary
+        run: |
+          echo "## Weekly DevOps Summary - $(date -u '+%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| チェック項目 | 状態 |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| npm audit | ${{ needs.dependency-audit.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| CI health check | ${{ needs.ci-health-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**次回実行**: 来週月曜 09:00 JST" >> $GITHUB_STEP_SUMMARY

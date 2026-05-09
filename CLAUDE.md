@@ -49,11 +49,14 @@ Codex が利用可能な場合のみ実行する。**Codex が使えなくても
 - 📖 README.md は分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。
 - 📋 **GitHub Projects も常に更新してください。**
 
-**プロジェクト期間の制約（最優先）:**
-- プロジェクト登録から **6ヶ月後の本番リリース** は厳守
+**プロジェクト期間はCTO全権委任で決定（最優先）:**
+- 6か月は**デフォルト目安**であり、強制制約ではない。CTO判断で短縮・延長・無期限すべて可
 - 実行は Linux Cron（月〜土、1セッション最大5時間）
-- 開発フェーズの配分はCTO判断で自由に変更してOK（期限内に収めること）
-- GitHub Projects に6ヶ月後のマイルストーン（Production Release）を設定・維持すること
+- 開発フェーズの配分はCTO判断で自由に変更してOK
+- CTO が「デプロイ準備完了」と判断したら `deploy.ready=true` を設定し、手順書を自動生成する
+- 実際のデプロイ実行は**人間（ユーザー）が手動**で行う（CTOはデプロイを自動実行しない）
+- デプロイ完了後: `maintenance.phase_mode="maintenance"` + `maintenance.released_at` を設定 → **無期限保守フェーズへ移行**
+- GitHub Projects のマイルストーン（Production Release）はCTO判断のタイミングに合わせて設定・更新する
 
 ユーザーが具体的な指示を出していない場合は、Monitor フェーズから開始し、
 GitHub Projects / Issues / CI の状態を確認して次のアクションを決定してください。
@@ -553,9 +556,106 @@ One tab, one project / Rest on Sunday
 | Loops | `claudeos/loops/build-loop.md` |
 | Loops | `claudeos/loops/verify-loop.md` |
 | Loops | `claudeos/loops/improve-loop.md` |
+| Loops | `claudeos/loops/maintenance-loop.md` |
+| Deployment | `claudeos/docs/deploy-runbook-template.md` |
 | CI | `claudeos/ci/ci-manager.md` |
 | Evolution | `claudeos/evolution/self-evolution.md` |
 | グローバル設定 | `~/.claude/CLAUDE.md` |
+
+## 24. 保守フェーズ（リリース後）
+
+リリース達成後は `state.json` の `project.phase_mode` を `"maintenance"` に変更し、
+以下の保守ポリシーへ自動移行します。
+
+### フェーズ移行トリガー
+
+```json
+// state.json を以下に更新してフェーズ移行
+{
+  "project": { "phase_mode": "maintenance" },
+  "maintenance": { "released_at": "<リリース日時ISO8601>" }
+}
+```
+
+### 保守モードのループ（開発ループとの差分）
+
+| 項目 | 開発モード | 保守モード |
+|---|---|---|
+| メインループ | Monitor→Build→Verify→Improve | **Monitor→Triage→Fix→Verify→Deploy** |
+| 定期ループ | なし | **Weekly/Monthly/Quarterly DevOps** |
+| セッション時間上限 | 300分 | **120分** |
+| cron頻度 | 月〜土（週6回） | **週2〜3回** |
+| 主KPI | CI成功率 90% | **SLA稼働率 99.5% / MTTR 4h以内** |
+| ループ定義 | `claudeos/loops/*-loop.md` | **`claudeos/loops/maintenance-loop.md`** |
+
+### インシデント対応フロー
+
+```
+アラート検知
+  └─ Triage（P1/P2/P3判定）
+       ├─ P1: Debugger→Developer→QA→DevOps→CTO（即時対応）
+       ├─ P2: Developer→Reviewer→QA→DevOps（当日〜翌日）
+       └─ P3: Backlog登録→次週 Weekly DevOps で対応
+Fix完了後:
+  └─ Verify（回帰テスト）→ Deploy → Post-mortem記録 → state.json更新
+```
+
+### 定期DevOpsスケジュール
+
+| 頻度 | cron（Linux） | 内容 |
+|---|---|---|
+| 週次（月曜） | `0 9 * * 1` | npm audit / CI health / Issue triage / Projects更新 |
+| 月次（1日） | `0 2 1 * *` | dependency minor update / security deep scan / KPIレポート |
+| 四半期 | `0 2 1 3,6,9,12 *` | major dependency評価 / アーキテクチャ評価 / 人間サインオフ |
+
+### Agent Teams（保守モード 軽量化）
+
+| フロー | 起動Agent |
+|---|---|
+| 定期DevOps | DevOps → Security → Analyst |
+| インシデントP1 | Debugger → Developer → QA → DevOps → CTO |
+| インシデントP2 | Developer → Reviewer → QA → DevOps |
+| 依存更新 | Developer → QA → DevOps |
+
+### 保守フェーズの STABLE 判定
+
+以下をすべて満たした場合のみ deploy 許可：
+
+- hotfix test success
+- lint success
+- security scan: critical/high 0件
+- CI success
+- 影響範囲レビュー完了（Reviewer または Codex）
+- P1インシデント対応は CTO 最終承認
+
+### 保守フェーズの禁止事項
+
+- 保守セッション中の新機能追加（別セッションで対応）
+- SLA未確認の deploy
+- インシデント未解決のまま定期DevOpsへ進む
+- Post-mortem 未記録の P1 クローズ
+- Error Budget がゼロ以下の状態での deploy
+
+### 複数プロジェクト管理（保守モード）
+
+`config.json` の各プロジェクトに `phase_mode` を設定し、`cron-launcher.sh` が自動分岐：
+
+```json
+// config.json プロジェクト設定例
+{
+  "name": "ProjectA",
+  "phase_mode": "maintenance",   // リリース済み
+  "maintenance_cron_day": "monday"
+}
+```
+
+```json
+{
+  "name": "ProjectB",
+  "phase_mode": "development",   // 開発中
+  "maintenance_cron_day": null
+}
+```
 
 
 <claude-mem-context>

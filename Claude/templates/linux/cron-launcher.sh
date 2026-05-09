@@ -172,7 +172,40 @@ try:
     print(s[:300] if s else '(none)')
 except: print('(none)')
 " 2>/dev/null || echo "(none)")
-  echo "[cron-launcher] state restored: phase=$RESUME_PHASE consecutive=$RESUME_CONSECUTIVE" >> "$LOG_FILE"
+
+  # --- 保守モード分岐 ---
+  # project.phase_mode が "maintenance" なら セッション時間・フェーズを保守用に切替
+  PHASE_MODE=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open('$STATE_FILE'))
+    # project.phase_mode を優先。なければ maintenance.phase_mode を参照
+    mode = d.get('project',{}).get('phase_mode') or d.get('maintenance',{}).get('phase_mode','development')
+    print(mode)
+except: print('development')
+" 2>/dev/null || echo "development")
+
+  if [[ "$PHASE_MODE" == "maintenance" ]]; then
+    # 保守モード: 引数の DURATION_MIN を state.json の maintenance.session_max_minutes で上書き
+    MAINT_MAX=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open('$STATE_FILE'))
+    print(d.get('maintenance',{}).get('session_max_minutes', 120))
+except: print(120)
+" 2>/dev/null || echo "120")
+    # 引数が保守上限を超える場合のみ短縮（引数が既に短い場合はそのまま）
+    if [[ "$DURATION_MIN" -gt "$MAINT_MAX" ]]; then
+      echo "[cron-launcher] maintenance mode: DURATION_MIN capped $DURATION_MIN -> $MAINT_MAX min" >> "$LOG_FILE"
+      DURATION_MIN="$MAINT_MAX"
+      DURATION_SEC=$((DURATION_MIN * 60))
+    fi
+    # 保守フェーズを開始フェーズとして設定（Monitor から Triage へ移行させる）
+    [[ "$RESUME_PHASE" == "Monitor" ]] && RESUME_PHASE="Maintenance"
+    echo "[cron-launcher] phase_mode=maintenance session_max=${MAINT_MAX}min" >> "$LOG_FILE"
+  fi
+
+  echo "[cron-launcher] state restored: phase=$RESUME_PHASE phase_mode=$PHASE_MODE consecutive=$RESUME_CONSECUTIVE" >> "$LOG_FILE"
 
   # state.json の execution.phase と current_session_start_at を更新
   python3 - <<PYEOF >> "$LOG_FILE" 2>&1 || true
@@ -206,7 +239,11 @@ fi
 
 # 復元情報をプロンプトの先頭に注入（state.json が存在する場合のみ）
 if [[ -f "$STATE_FILE" ]]; then
-  RESUME_HEADER="[Cron Session Resume] phase=${RESUME_PHASE} consecutive_success=${RESUME_CONSECUTIVE} last_summary=${RESUME_SUMMARY}
+  MAINT_NOTE=""
+  if [[ "${PHASE_MODE:-development}" == "maintenance" ]]; then
+    MAINT_NOTE=" [maintenance mode: max ${DURATION_MIN}min, loop=maintenance-loop.md, KPI=SLA/MTTR]"
+  fi
+  RESUME_HEADER="[Cron Session Resume] phase=${RESUME_PHASE} phase_mode=${PHASE_MODE:-development}${MAINT_NOTE} consecutive_success=${RESUME_CONSECUTIVE} last_summary=${RESUME_SUMMARY}
 
 "
   PROMPT_ARG="${RESUME_HEADER}${PROMPT_ARG}"

@@ -1,0 +1,113 @@
+name: Monthly Security & Dependency Review
+
+on:
+  schedule:
+    # 毎月1日 02:00 JST (UTC+9 = 17:00 UTC 前月末)
+    - cron: '0 17 28-31 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  security-events: write
+
+jobs:
+  check-day:
+    name: Run only on 1st of month
+    runs-on: ubuntu-latest
+    outputs:
+      is_first: ${{ steps.day_check.outputs.is_first }}
+    steps:
+      - name: Check if today is 1st
+        id: day_check
+        run: |
+          DAY=$(date -u +%d)
+          if [ "$DAY" = "01" ]; then
+            echo "is_first=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_first=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  security-deep-scan:
+    name: Security Deep Scan
+    needs: check-day
+    if: ${{ needs.check-day.outputs.is_first == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks (full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: npm audit (full report)
+        run: |
+          npm audit --json 2>/dev/null | python3 -c "
+          import sys, json
+          try:
+            d = json.load(sys.stdin)
+            vulns = d.get('metadata', {}).get('vulnerabilities', {})
+            print('=== Monthly Security Report ===')
+            for level in ['critical','high','moderate','low','info']:
+              print(f'{level}: {vulns.get(level, 0)}')
+          except Exception as e:
+            print('parse error:', e)
+          " || npm audit || true
+
+      - name: Check npm outdated
+        run: npm outdated || true
+
+      - name: Generate monthly security summary
+        run: |
+          echo "## Monthly Security & Dependency Report - $(date -u '+%Y-%m')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 実施項目" >> $GITHUB_STEP_SUMMARY
+          echo "- gitleaks (secrets scan): 完了" >> $GITHUB_STEP_SUMMARY
+          echo "- npm audit (full): 完了" >> $GITHUB_STEP_SUMMARY
+          echo "- npm outdated: 完了" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 次のアクション" >> $GITHUB_STEP_SUMMARY
+          echo "- High/Critical 脆弱性は P1/P2 Issue として対応" >> $GITHUB_STEP_SUMMARY
+          echo "- Moderate は次の保守セッションで対応" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**次回実行**: 翌月1日 02:00 JST" >> $GITHUB_STEP_SUMMARY
+
+  kpi-report:
+    name: Monthly KPI Report
+    needs: check-day
+    if: ${{ needs.check-day.outputs.is_first == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Read maintenance KPI from state.json
+        run: |
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('state.json','utf8'));
+          const m = data.maintenance ?? {};
+          console.log('=== Monthly KPI Report ===');
+          console.log('phase_mode:', m.phase_mode ?? 'development');
+          console.log('sla_target:', m.sla_target_availability ?? 'N/A');
+          console.log('mttr_target_hours:', m.mttr_target_hours ?? 'N/A');
+          console.log('error_budget_remaining_pct:', m.error_budget_remaining_pct ?? 100);
+          console.log('incident_count_30d:', m.incident_count_30d ?? 0);
+          console.log('open_incidents:', JSON.stringify(m.open_incidents ?? []));
+          " 2>&1 | tee kpi-report.txt
+
+      - name: Upload KPI report
+        uses: actions/upload-artifact@v4
+        with:
+          name: monthly-kpi-report-${{ github.run_id }}
+          path: kpi-report.txt
+          retention-days: 90
