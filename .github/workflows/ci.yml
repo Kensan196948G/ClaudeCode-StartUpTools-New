@@ -197,7 +197,7 @@ jobs:
             'RemoteTrigger.*Cloud',
             'Cloud Schedule.*登録'
           )
-          $excludePatterns = @('CHANGELOG', 'TASKS.md', 'NewCloudSchedule.Tests', 'New-CloudSchedule.ps1', '.git')
+          $excludePatterns = @('CHANGELOG', 'TASKS.md', 'NewCloudSchedule.Tests', 'New-CloudSchedule.ps1', '.git', 'CLAUDE.md')
           $targets = Get-ChildItem -Path . -Recurse -Include '*.ps1','*.md','*.json' -ErrorAction SilentlyContinue |
             Where-Object {
               $f = $_.FullName
