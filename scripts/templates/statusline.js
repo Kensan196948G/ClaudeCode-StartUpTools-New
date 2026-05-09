@@ -1,9 +1,7 @@
-// Claude Code status line script (Windows / Node.js)
-// Reads JSON from stdin, outputs formatted multi-line status bar with ANSI colors.
+// Claude Code status line script — 2-line output
 const { execSync } = require("child_process");
 const os = require("os");
 
-// ANSI color codes
 const C = {
   cyan: "\x1b[36m",
   green: "\x1b[32m",
@@ -28,45 +26,40 @@ function getGitBranch(cwd) {
   }
 }
 
-function progressBar(pct, width = 10) {
+function progressBar(pct, width = 8) {
   const filled = Math.round((pct / 100) * width);
   const empty = width - filled;
-  // Green for filled, dim gray for empty
   let color = C.green;
   if (pct >= 80) color = C.red;
   else if (pct >= 50) color = C.yellow;
-  return color + "\u25b0".repeat(filled) + C.cyan + "\u25b1".repeat(empty) + C.r;
+  return color + "▰".repeat(filled) + C.cyan + "▱".repeat(empty) + C.r;
 }
 
 function formatDuration(ms) {
   const totalSec = Math.floor(ms / 1000);
   const hours = Math.floor(totalSec / 3600);
   const minutes = Math.floor((totalSec % 3600) / 60);
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  if (hours > 0) return `${hours}h${String(minutes).padStart(2, "0")}m`;
   return `${minutes}m`;
 }
 
-function formatResetTime(epoch) {
+// Compact reset time: "3pm Asia/Tokyo" (same day) or "1/15 3pm Asia/Tokyo" (different day)
+function formatResetCompact(epoch) {
   if (!epoch) return "";
   const dt = new Date(epoch * 1000);
   const now = new Date();
+  const tz = "Asia/Tokyo";
   const timeStr = dt
-    .toLocaleString("en-US", {
-      hour: "numeric",
-      hour12: true,
-      timeZone: "Asia/Tokyo",
-    })
-    .toLowerCase();
+    .toLocaleString("en-US", { hour: "numeric", hour12: true, timeZone: tz })
+    .toLowerCase()
+    .replace(" ", "");
   const sameDay =
-    dt.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" }) ===
-    now.toLocaleDateString("en-US", { timeZone: "Asia/Tokyo" });
-  if (sameDay) return `Resets ${timeStr} (Asia/Tokyo)`;
-  const dateStr = dt.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "Asia/Tokyo",
-  });
-  return `Resets ${dateStr} at ${timeStr} (Asia/Tokyo)`;
+    dt.toLocaleDateString("en-US", { timeZone: tz }) ===
+    now.toLocaleDateString("en-US", { timeZone: tz });
+  if (sameDay) return `${timeStr} Asia/Tokyo`;
+  const m = dt.toLocaleString("en-US", { month: "numeric", timeZone: tz });
+  const d = dt.toLocaleString("en-US", { day: "numeric", timeZone: tz });
+  return `${m}/${d} ${timeStr} Asia/Tokyo`;
 }
 
 let raw = "";
@@ -82,16 +75,17 @@ process.stdin.on("end", () => {
   }
 
   const model = data.model || {};
-  const modelName = model.display_name || model.id || "?";
+  const modelName = (model.display_name || model.id || "?")
+    .replace("claude-", "")
+    .replace("-20", " ");
 
   const cwd = data.cwd || "";
   const project = cwd ? require("path").basename(cwd) : "?";
-
   const branch = getGitBranch(cwd || ".");
-  const osName = os.platform() === "win32" ? "Windows" : os.platform();
+  const platform = os.platform() === "win32" ? "win" : os.platform().replace("darwin", "mac");
 
   const ctx = data.context_window || {};
-  const ctxPct = ctx.used_percentage || 0;
+  const ctxPct = Math.round(ctx.used_percentage || 0);
 
   const cost = data.cost || {};
   const linesAdded = cost.total_lines_added || 0;
@@ -101,45 +95,38 @@ process.stdin.on("end", () => {
   const rateLimits = data.rate_limits || {};
   const fiveHour = rateLimits.five_hour || {};
   const sevenDay = rateLimits.seven_day || {};
-
-  const sep = ` ${C.blue}\u2502${C.r} `;
-
-  // Line 1: Model / Project / Branch / OS
-  const line1 = [
-    `${C.magenta}\ud83e\udd16 ${C.bold}${modelName}${C.r}`,
-    `${C.yellow}\ud83d\udcc1 ${project}${C.r}`,
-    `${C.green}\ud83c\udf3f ${branch}${C.r}`,
-    `${C.cyan}\ud83d\udda5  ${osName}${C.r}`,
-  ].join(sep);
-  console.log(line1);
-
-  // Line 2: Context % / File changes / Duration
-  const ctxBar = progressBar(ctxPct);
-  const line2Parts = [
-    `${C.blue}\ud83d\udcca ${C.white}${Math.round(ctxPct)}%${C.r} ${ctxBar}`,
-    `${C.cyan}\u270f\ufe0f  ${C.green}+${linesAdded}${C.r}/${C.red}-${linesRemoved}${C.r}`,
-  ];
-  if (durationMs > 0)
-    line2Parts.push(`${C.blue}\u23f1  ${C.white}${formatDuration(durationMs)}${C.r}`);
-  console.log(line2Parts.join(sep));
-
-  // Line 3: 5-hour rate limit (Pro/Max only)
   const fivePct = fiveHour.used_percentage;
-  if (fivePct != null) {
-    const fiveBar = progressBar(fivePct);
-    const fiveReset = formatResetTime(fiveHour.resets_at);
-    console.log(
-      `${C.blue}\u23f1  5h${C.r}  ${fiveBar}  ${C.white}${Math.round(fivePct)}%${C.r}     ${C.cyan}${fiveReset}${C.r}`
-    );
-  }
-
-  // Line 4: 7-day rate limit (Pro/Max only)
   const sevenPct = sevenDay.used_percentage;
+
+  const sep = `${C.blue} | ${C.r}`;
+
+  // Line 1: model / project / branch / platform / context / file changes / duration
+  const line1Parts = [
+    `${C.magenta}[${modelName}]${C.r}`,
+    `${C.yellow}${project}${C.r}`,
+    `${C.green}${branch}${C.r}`,
+    `${C.cyan}${platform}${C.r}`,
+    `${C.blue}ctx:${C.white}${ctxPct}%${C.r} ${progressBar(ctxPct)}`,
+    `${C.green}+${linesAdded}${C.r}/${C.red}-${linesRemoved}${C.r}`,
+  ];
+  if (durationMs > 0) {
+    line1Parts.push(`${C.blue}${formatDuration(durationMs)}${C.r}`);
+  }
+  process.stdout.write(line1Parts.join(sep) + "\n");
+
+  // Line 2: rate limits (5h / 7d) — omitted entirely if neither is available
+  const line2Parts = [];
+  if (fivePct != null) {
+    const rst = formatResetCompact(fiveHour.resets_at);
+    const rstPart = rst ? ` ${C.cyan}rst:${rst}${C.r}` : "";
+    line2Parts.push(`${C.blue}5h:${C.white}${Math.round(fivePct)}%${C.r} ${progressBar(fivePct, 8)}${rstPart}`);
+  }
   if (sevenPct != null) {
-    const sevenBar = progressBar(sevenPct);
-    const sevenReset = formatResetTime(sevenDay.resets_at);
-    console.log(
-      `${C.blue}\ud83d\udcc5 7d${C.r}  ${sevenBar}  ${C.white}${Math.round(sevenPct)}%${C.r}  ${C.cyan}\u5168\u30e2\u30c7\u30eb${C.r}     ${C.cyan}${sevenReset}${C.r}`
-    );
+    const rst = formatResetCompact(sevenDay.resets_at);
+    const rstPart = rst ? ` ${C.cyan}rst:${rst}${C.r}` : "";
+    line2Parts.push(`${C.blue}7d:${C.white}${Math.round(sevenPct)}%${C.r} ${progressBar(sevenPct, 8)}${rstPart}`);
+  }
+  if (line2Parts.length > 0) {
+    process.stdout.write(line2Parts.join(sep) + "\n");
   }
 });
