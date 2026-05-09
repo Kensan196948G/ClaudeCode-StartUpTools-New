@@ -439,7 +439,9 @@ function Invoke-CronTest {
             '-File', $watchScript,
             '-WithSessionInfoTab'
         )
-        $wtArgs = @('-w', '0', 'new-tab', '--title', 'Claude-Live-Log', '--', $psExe) + $psArgs
+        $wtProfileName = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { 'AI CLI Startup' }
+        $profileArgs = @('-p', $wtProfileName)
+        $wtArgs = @('-w', '0', 'new-tab') + $profileArgs + @('--title', 'Claude-Live-Log', '--', $psExe) + $psArgs
         Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgs -WindowStyle Hidden
         Write-Host "  [OK] ライブログ監視タブを開きました" -ForegroundColor Cyan
         Write-Host "       ログ検出後にセッション情報タブが自動で開きます" -ForegroundColor DarkGray

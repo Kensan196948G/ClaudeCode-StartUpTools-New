@@ -219,6 +219,12 @@ try {
         exit 0
     }
 
+    # --- WT Profile 環境変数: Watch-ClaudeLog / Session Info タブに伝搬 ---
+    $wtProfileForSession = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { '' }
+    if (-not [string]::IsNullOrWhiteSpace($wtProfileForSession)) {
+        $env:AI_STARTUP_WT_PROFILE = $wtProfileForSession
+    }
+
     # --- Session Info Tab (v3.1.0) ---
     # session.json を生成して、Windows Terminal に情報タブを 1 枚開く。
     $sessionDurationMin = 300
@@ -241,6 +247,10 @@ try {
                 )
                 if (-not [string]::IsNullOrWhiteSpace($sessionsDir)) {
                     $tabArgs += @('-SessionsDir', $sessionsDir)
+                }
+                $wtProfileName = if ($Config.windowsTerminal -and $Config.windowsTerminal.profileName) { $Config.windowsTerminal.profileName } else { '' }
+                if (-not [string]::IsNullOrWhiteSpace($wtProfileName)) {
+                    $tabArgs += @('-WtProfile', $wtProfileName)
                 }
                 Start-Process -FilePath (Get-Process -Id $PID).Path -ArgumentList $tabArgs -WindowStyle Hidden
                 Write-Info "Session Info タブを起動: $($session.sessionId)"

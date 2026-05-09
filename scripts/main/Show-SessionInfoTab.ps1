@@ -11,7 +11,8 @@ param(
     [Parameter(Mandatory)][string]$SessionId,
     [string]$SessionsDir = '',
     [string]$Title = 'Claude Session Info',
-    [int]$PollIntervalSeconds = 1
+    [int]$PollIntervalSeconds = 1,
+    [string]$WtProfile = ''
 )
 
 Set-StrictMode -Version Latest
@@ -44,7 +45,8 @@ if (-not [string]::IsNullOrWhiteSpace($SessionsDir)) {
 try {
     if ($wtExe) {
         # wt.exe 経由で同一ウィンドウ (w 0) に新タブ
-        $wtArgs = @('-w', '0', 'new-tab', '--title', $Title, $psExe) + $psArgs
+        $profileArgs = if (-not [string]::IsNullOrWhiteSpace($WtProfile)) { @('-p', $WtProfile) } else { @() }
+        $wtArgs = @('-w', '0', 'new-tab') + $profileArgs + @('--title', $Title, $psExe) + $psArgs
         Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgs -WindowStyle Hidden
         Write-Host "[INFO] Claude Session Info タブを開きました (wt.exe)" -ForegroundColor Cyan
     }

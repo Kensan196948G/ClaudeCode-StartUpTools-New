@@ -185,15 +185,44 @@ function Get-RecentProjectLaunchSpec {
     }
 }
 
+function Get-ProjectPhaseMode {
+    # state.json からフェーズ・デプロイ状態を読み取る（失敗時は development を返す）
+    try {
+        $stateFile = Join-Path $ProjectRoot "state.json"
+        if (Test-Path $stateFile) {
+            $state = Get-Content $stateFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $mode = if ($state.maintenance.phase_mode) { $state.maintenance.phase_mode } else { "development" }
+            $deployReady = if ($null -ne $state.deploy.ready) { $state.deploy.ready } else { $false }
+            return [pscustomobject]@{ Mode = $mode; DeployReady = $deployReady }
+        }
+    } catch { }
+    return [pscustomobject]@{ Mode = "development"; DeployReady = $false }
+}
+
 function Show-Menu {
     Clear-Host
     $hr = "  " + ("─" * 52)
+
+    $phaseInfo = Get-ProjectPhaseMode
+    $isMaintenance = ($phaseInfo.Mode -eq "maintenance" -or $phaseInfo.Mode -eq "released")
+    $isDevelopment = -not $isMaintenance
+
+    # フェーズ表示色
+    $phaseColor = if ($isMaintenance) { "Green" } else { "Cyan" }
+    $phaseLabel = switch ($phaseInfo.Mode) {
+        "maintenance" { "保守・運用中 (maintenance)" }
+        "released"    { "リリース済み (released)" }
+        default       { "開発中 (development)" }
+    }
+    $deployBadge = if ($phaseInfo.DeployReady -and $isDevelopment) { " 🚀 デプロイ準備完了!" } else { "" }
 
     Write-Host ""
     Write-Host "  ╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
     Write-Host "  ║  🤖 ClaudeCode スタートアップツール v3.2 / v8.2 ║" -ForegroundColor Cyan
     Write-Host "  ╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
 
+    Write-Host "  📋 フェーズ: " -NoNewline -ForegroundColor DarkGray
+    Write-Host "$phaseLabel$deployBadge" -ForegroundColor $phaseColor
     Write-Host "  🔗 " -NoNewline -ForegroundColor Yellow
     Write-Host "$LinuxHost ➜ $LinuxBase" -NoNewline -ForegroundColor White
     Write-Host "  📂 " -NoNewline -ForegroundColor Green
@@ -208,6 +237,28 @@ function Show-Menu {
     Write-Host "   " -NoNewline; Write-Host " L1 " -NoNewline -ForegroundColor Black -BackgroundColor Green
     Write-Host "  🖥️  ローカル (即起動)" -ForegroundColor Green
     Write-Host ""
+
+    # デプロイ・保守移行（開発フェーズのみ）
+    if ($isDevelopment) {
+        Write-Host "  🚢 " -NoNewline -ForegroundColor Blue
+        Write-Host "デプロイ管理" -ForegroundColor DarkBlue
+        Write-Host "   " -NoNewline; Write-Host "  D " -NoNewline -ForegroundColor Black -BackgroundColor Blue
+        Write-Host "  🚀 デプロイ準備（Runbook生成・前提チェック）" -ForegroundColor Blue
+        Write-Host "   " -NoNewline; Write-Host "  M " -NoNewline -ForegroundColor Black -BackgroundColor DarkCyan
+        Write-Host "  🔄 保守モードへ移行（リリース完了後）" -ForegroundColor DarkCyan
+        Write-Host ""
+    }
+
+    # インシデント・DevOps（保守フェーズのみ）
+    if ($isMaintenance) {
+        Write-Host "  🛡️  " -NoNewline -ForegroundColor Green
+        Write-Host "保守・運用" -ForegroundColor DarkGreen
+        Write-Host "   " -NoNewline; Write-Host "  I " -NoNewline -ForegroundColor Black -BackgroundColor Red
+        Write-Host "  🚨 インシデント対応（P1/P2/P3トリアージ）" -ForegroundColor Red
+        Write-Host "   " -NoNewline; Write-Host "  W " -NoNewline -ForegroundColor Black -BackgroundColor DarkGreen
+        Write-Host "  📊 週次 DevOps レポート確認" -ForegroundColor DarkGreen
+        Write-Host ""
+    }
 
     # 診断・ツール
     Write-Host "  🔧 " -NoNewline -ForegroundColor Magenta
@@ -305,9 +356,28 @@ while ($true) {
     switch ($choice.ToUpper()) {
         "S1" { Invoke-ToolFromMenu -Tool "claude" }
         "L1" { Invoke-ToolFromMenu -Tool "claude" -Local }
+        "D"  { Invoke-MenuScript -File "scripts\main\Start-DeployPrep.ps1" }
+        "M"  {
+            Write-Host ""
+            Write-Host "  保守モードへ移行します。" -ForegroundColor Cyan
+            Write-Host "  デプロイ完了を確認しましたか？ (y/N): " -NoNewline -ForegroundColor Yellow
+            $confirm = Read-Host
+            if ($confirm.ToUpper() -eq "Y") {
+                Invoke-MenuScript -File "scripts\main\Start-MaintenanceMode.ps1"
+            } else {
+                Write-Host "  キャンセルしました。" -ForegroundColor Gray
+                Start-Sleep -Seconds 1
+            }
+        }
+        "I"  { Invoke-MenuScript -File "scripts\main\Start-IncidentResponse.ps1" }
+        "W"  { Invoke-MenuScript -File "scripts\main\Start-WeeklyDevOps.ps1" }
         "5"  { Invoke-MenuScript -File "scripts\test\Test-AllTools.ps1" }
         "6"  { Invoke-MenuScript -File "scripts\test\test-drive-mapping.ps1" }
-        "7"  { Invoke-MenuScript -File "scripts\setup\setup-windows-terminal.ps1" }
+        "7"  {
+            $wtBgImage = if ($Config.windowsTerminal -and $Config.windowsTerminal.backgroundImage) { $Config.windowsTerminal.backgroundImage } else { '' }
+            $setupArgs = if (-not [string]::IsNullOrWhiteSpace($wtBgImage)) { @('-BackgroundImage', $wtBgImage) } else { @() }
+            Invoke-MenuScript -File "scripts\setup\setup-windows-terminal.ps1" -ScriptArgs $setupArgs
+        }
         "8"  { Invoke-MenuScript -File "scripts\test\Test-McpHealth.ps1" }
         "9"  { Invoke-MenuScript -File "scripts\test\Test-AgentTeams.ps1" }
         "10" { Invoke-MenuScript -File "scripts\test\Test-WorktreeManager.ps1" }
