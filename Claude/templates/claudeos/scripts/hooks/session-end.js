@@ -77,6 +77,37 @@ try {
   console.error(`[SessionEnd] state update failed: ${err.message}`);
 }
 
+// ReasoningBank: セッション終了時にパターンを保存する（fail-soft）。
+// state.json の atomic write が完了した直後に実行し、最新の stable / debug を参照する。
+try {
+  const rb       = require("./reasoning-bank.js");
+  const stateRB  = readJson(STATE_FILE);
+  if (stateRB) {
+    const projectName = path.basename(process.cwd());
+    const dataDir     = path.join(__dirname, "..", "..", "data");
+    const bank        = rb.loadBank(dataDir);
+    const entry       = rb.buildEntry(stateRB, projectName);
+    if (entry) {
+      rb.updateSONAWeights(bank, entry.project, entry.tags, entry.stable_achieved);
+      rb.upsertEntry(bank, entry);
+      rb.pruneBank(bank);
+      rb.saveBank(dataDir, bank);
+      const sonaUpdated = bank.entries.filter(e => e.id !== entry.id).length;
+      console.log(`[ReasoningBank] Saved: ${entry.id} conf=${entry.confidence.toFixed(2)} tags=[${entry.tags.join(",")}] | SONA updated ${sonaUpdated} existing entries`);
+    } else {
+      const stateRBStab = (stateRB.stable || {});
+      const stateRBExec = (stateRB.execution || {});
+      const fallbackTags = rb.extractTags(stateRBExec.last_session_summary || "");
+      rb.updateSONAWeights(bank, path.basename(process.cwd()), fallbackTags, !!stateRBStab.stable_achieved);
+      rb.pruneBank(bank);
+      rb.saveBank(dataDir, bank);
+      console.log("[ReasoningBank] Entry skipped (confidence < 0.30 or no summary) | SONA decay applied");
+    }
+  }
+} catch (rbErr) {
+  console.error(`[ReasoningBank] ${rbErr.message}`);
+}
+
 // notify-stable を同期実行する（state.json への書き込みが完了してから）。
 // 失敗しても Stop hook をブロックしない。
 try {

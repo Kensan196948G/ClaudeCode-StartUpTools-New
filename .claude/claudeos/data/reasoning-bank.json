@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "description": "ClaudeOS ReasoningBank — セッション間自己学習パターンストア (Stage-1〜3)",
+  "entries": [
+    {
+      "id": "rb-2026-05-10T02-26-33-v488",
+      "timestamp": "2026-05-10T02:26:33.877Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 1,
+      "used_count": 2,
+      "last_used": "2026-05-10T02:35:22.623Z"
+    }
+  ]
+}

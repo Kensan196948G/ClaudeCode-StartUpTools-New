@@ -5,6 +5,10 @@
 *.sh text eol=lf
 *.bash text eol=lf
 
+# Node.js hooks run on Linux — must be LF
+*.js text eol=lf
+*.json text eol=lf
+
 # Other Unix-only files
 Makefile text eol=lf
 *.mk text eol=lf
