@@ -269,8 +269,9 @@ function Invoke-SyncLauncher {
     $sshOpts = @('-T', '-o', 'ConnectTimeout=10', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ControlMaster=no')
     $claudeosDir = '/home/kensan/.claudeos'
     & $sshExe @sshOpts $LinuxHost "mkdir -p '$claudeosDir'" 2>$null
-    $content = (Get-Content $localFile -Raw -Encoding UTF8) -replace "`r`n", "`n"
-    $content | & $sshExe @sshOpts $LinuxHost "cat > '$claudeosDir/cron-launcher.sh' && chmod +x '$claudeosDir/cron-launcher.sh'"
+    $content = (Get-Content $localFile -Raw -Encoding UTF8) -replace "`r`n", "`n" -replace "`r", "`n"
+    # Linux 側で tr -d '\r' を通してから書き込む（パイプ経由の \r 混入を防止）
+    $content | & $sshExe @sshOpts $LinuxHost "tr -d '\r' > '$claudeosDir/cron-launcher.sh' && chmod +x '$claudeosDir/cron-launcher.sh'"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  [LAUNCHER] Linux に同期しました: $claudeosDir/cron-launcher.sh" -ForegroundColor Green
     } else {
@@ -434,18 +435,13 @@ function Invoke-CronTest {
     $wtExe = Get-Command wt.exe -ErrorAction SilentlyContinue
 
     if ($wtExe -and (Test-Path $watchScript)) {
-        $psArgs = @(
-            '-NoExit', '-NoProfile', '-ExecutionPolicy', 'Bypass',
-            '-File', $watchScript,
-            '-WithSessionInfoTab'
-        )
         $wtProfileName = if (
             ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
             ($Config.windowsTerminal.PSObject.Properties.Name -contains 'profileName') -and $Config.windowsTerminal.profileName
         ) { [string]$Config.windowsTerminal.profileName } else { 'AI CLI Startup' }
-        $profileArgs = @('-p', $wtProfileName)
-        $wtArgs = @('-w', '0', 'new-tab') + $profileArgs + @('--title', 'Claude-Live-Log', '--', $psExe) + $psArgs
-        Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgs -WindowStyle Hidden
+        # ArgumentList を文字列で渡し、スペース含みのプロファイル名・パスを確実に引用符で囲む
+        $wtArgStr = "-w 0 new-tab -p `"$wtProfileName`" --title `"Claude-Live-Log`" -- `"$psExe`" -NoExit -NoProfile -ExecutionPolicy Bypass -File `"$watchScript`""
+        Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgStr -WindowStyle Hidden
         Write-Host "  [OK] ライブログ監視タブを開きました" -ForegroundColor Cyan
         Write-Host "       ログ検出後にセッション情報タブが自動で開きます" -ForegroundColor DarkGray
     } else {

@@ -45,9 +45,11 @@ if (-not [string]::IsNullOrWhiteSpace($SessionsDir)) {
 try {
     if ($wtExe) {
         # wt.exe 経由で同一ウィンドウ (w 0) に新タブ
-        $profileArgs = if (-not [string]::IsNullOrWhiteSpace($WtProfile)) { @('-p', $WtProfile) } else { @() }
-        $wtArgs = @('-w', '0', 'new-tab') + $profileArgs + @('--title', $Title, $psExe) + $psArgs
-        Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgs -WindowStyle Hidden
+        $profilePart = if (-not [string]::IsNullOrWhiteSpace($WtProfile)) { " -p `"$WtProfile`"" } else { '' }
+        # ArgumentList を文字列で渡し、スペース含みのプロファイル名・パスを確実に引用符で囲む
+        # また -- セパレータで wt.exe 引数とシェルコマンドを明示的に区切る
+        $wtArgStr = "-w 0 new-tab$profilePart --title `"$Title`" -- `"$psExe`" " + ($psArgs -join ' ')
+        Start-Process -FilePath $wtExe.Source -ArgumentList $wtArgStr -WindowStyle Hidden
         Write-Host "[INFO] Claude Session Info タブを開きました (wt.exe)" -ForegroundColor Cyan
     }
     else {
