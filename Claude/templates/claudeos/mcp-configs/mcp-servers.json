@@ -1,20 +1,73 @@
 {
+  "$schema": "ClaudeOS v8.2 MCP registry",
+  "_comment": "プロジェクトに配布する MCP サーバの実体登録カタログ。Claude Code は .mcp.json をプロジェクトルートで自動検出するため、setup スクリプトが本ファイルを読み、state.json の mcp.enabled[] でフィルタして .mcp.json を生成する。",
+  "_usage": "プロジェクト別有効化は state.json の mcp.enabled に servers[].name を列挙する。例: { \"mcp\": { \"enabled\": [\"github\", \"supabase\"] } }",
   "servers": [
     {
       "name": "github",
-      "purpose": "Issue、PR、Actions、Repository 操作"
+      "purpose": "Issue / PR / Actions / Repository 操作",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" },
+      "default_enabled": true
     },
     {
       "name": "supabase",
-      "purpose": "DB、auth、storage の確認"
+      "purpose": "DB / auth / storage の確認",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@supabase/mcp-server-supabase@latest", "--access-token", "${SUPABASE_ACCESS_TOKEN}"],
+      "env": {},
+      "default_enabled": false
     },
     {
       "name": "vercel",
-      "purpose": "フロントエンドのデプロイと状態確認"
+      "purpose": "フロントエンドのデプロイと状態確認",
+      "transport": "http",
+      "url": "https://mcp.vercel.com/${VERCEL_TEAM}/sse",
+      "headers": { "Authorization": "Bearer ${VERCEL_TOKEN}" },
+      "default_enabled": false
     },
     {
       "name": "railway",
-      "purpose": "バックエンドや DB の運用確認"
+      "purpose": "バックエンドや DB の運用確認",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@railway/mcp-server"],
+      "env": { "RAILWAY_API_TOKEN": "${RAILWAY_API_TOKEN}" },
+      "default_enabled": false
+    },
+    {
+      "name": "context7",
+      "purpose": "ライブラリ / フレームワーク最新ドキュメント取得",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {},
+      "default_enabled": true
+    },
+    {
+      "name": "playwright",
+      "purpose": "ブラウザ自動操作 / E2E 検証",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"],
+      "env": {},
+      "default_enabled": false
+    },
+    {
+      "name": "memory",
+      "purpose": "セッション横断の長期メモリ（knowledge graph）",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": { "MEMORY_FILE_PATH": "${CLAUDE_MEMORY_FILE_PATH}" },
+      "default_enabled": true
     }
-  ]
+  ],
+  "_notes": {
+    "secrets": "API トークン類は環境変数経由。.mcp.json に平文展開しない。${VAR} は setup スクリプトでマスキング保持されたまま配布する。",
+    "deploy": "scripts/setup/install-mcp.js が本カタログと state.json.mcp.enabled を読み、プロジェクト直下に .mcp.json を生成する（既存ファイルがあればマージ）。"
+  }
 }
