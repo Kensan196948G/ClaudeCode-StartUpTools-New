@@ -125,6 +125,11 @@ testResults.xml
 reports/.loop-*.md
 reports/*.log
 reports/*.xml
+reports/agent-transcripts/
+reports/dashboards/
+reports/lint-summary.json
+reports/coverage-summary.json
+reports/deploy-runbook.md
 
 # バックアップディレクトリ
 scripts/claudeos-back/

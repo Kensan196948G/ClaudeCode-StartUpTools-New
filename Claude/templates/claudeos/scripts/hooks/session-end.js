@@ -50,6 +50,82 @@ try {
 
     dreamingEnabled = !!state.dreaming.dreaming_enabled;
 
+    // Verify フェーズで必須 SubAgent が起動されたかを検証する。
+    // qa / security-reviewer / e2e-runner のいずれも当該セッションで呼ばれていない場合は警告。
+    try {
+      const exec = state.execution || {};
+      const phase = exec.phase;
+      if (phase === "Verify") {
+        const sessionStart = exec.current_session_start_at;
+        const agentHist = ((state.learning || {}).usage_history || {}).agents || {};
+        const required = ["qa", "security-reviewer", "e2e-runner"];
+        const startMs = sessionStart ? Date.parse(sessionStart) : 0;
+        const launched = required.filter((k) => {
+          const last = agentHist[k] && agentHist[k].last_used;
+          return last && Date.parse(last) >= startMs;
+        });
+        if (launched.length === 0) {
+          state.warnings = state.warnings || [];
+          state.warnings.push({
+            at: new Date().toISOString(),
+            kind: "verify_subagent_missing",
+            message: "Verify フェーズで qa / security-reviewer / e2e-runner SubAgent が一度も起動されませんでした。STABLE 判定の必要条件を満たしていない可能性があります。",
+            phase,
+            required,
+          });
+          console.log("[SessionEnd][WARN] Verify phase ended without required SubAgent invocation");
+        }
+      }
+    } catch (verifyErr) {
+      console.error(`[SessionEnd] verify-subagent-check failed: ${verifyErr.message}`);
+    }
+
+    // Quality gate: lint / coverage の閾値違反を state.warnings へ追記する。
+    try {
+      const qg = require("./quality-gate-check.js");
+      const breaches = qg.evaluate(process.cwd(), state);
+      if (qg.appendWarnings(state, breaches)) {
+        console.log(`[SessionEnd][WARN] Quality gates breached: ${breaches.map(b => b.gate).join(", ")}`);
+      }
+    } catch (qgErr) {
+      // hook 自体は壊さない。レポート未生成等は無視。
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] quality-gate skipped: ${qgErr.message}`);
+    }
+
+    // Deploy runbook auto-gen: state.deploy.ready=true なら手順書を生成する。
+    // 実デプロイは人間手動。CTO は手順書生成までを担当。
+    try {
+      if (state.deploy && state.deploy.ready) {
+        const { spawnSync } = require("child_process");
+        const script = path.resolve(__dirname, "..", "..", "..", "..", "scripts", "release", "generate-deploy-runbook.js");
+        if (fs.existsSync(script)) {
+          const r = spawnSync(process.execPath, [script], { cwd: process.cwd(), encoding: "utf8" });
+          if (r.status === 0) console.log("[SessionEnd] deploy runbook generated (reports/deploy-runbook.md)");
+        }
+      }
+    } catch (drErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] deploy-runbook skipped: ${drErr.message}`);
+    }
+
+    // TDD coverage scan: 直近の変更ファイルに対応テストが無ければ warning 追加。
+    try {
+      const tdd = require("./tdd-coverage-scan.js");
+      const untested = tdd.scan(process.cwd());
+      if (untested.length > 0) {
+        state.warnings = state.warnings || [];
+        state.warnings.push({
+          at: new Date().toISOString(),
+          kind: "tdd_required",
+          message: `テスト未整備の変更が ${untested.length} 件あります。/tdd または tdd-guide agent で対応してください。`,
+          files: untested.slice(0, 30),
+          truncated: untested.length > 30,
+        });
+        console.log(`[SessionEnd][WARN] tdd_required: ${untested.length} untested file(s)`);
+      }
+    } catch (tddErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] tdd-scan skipped: ${tddErr.message}`);
+    }
+
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
 
