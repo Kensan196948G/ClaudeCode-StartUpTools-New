@@ -1,8 +1,6 @@
 # ClaudeOS Startup Dashboard
 
-Displays system initialization state.
-
-# ClaudeOS Startup Dashboard
+Auto-generated from state.json by `scripts/dashboards/render.js`.
 
 ## System Initialization
 
@@ -34,21 +32,24 @@ Displays system initialization state.
 
 ## Session Control
 
-- Start Time: {{timestamp}}
+- Start Time: {{session_start_at}}
 - Max Duration: 5h
-- Remaining Time: {{remaining}}
+- Remaining Time: {{remaining_hm}}
+- Trigger: {{exec_trigger}}
 
 ---
 
 ## Critical Status
 
-- CI: {{status}}
-- STABLE: {{true/false}}
-- Project Sync: {{ok/ng}}
+- CI: {{ci_last_result}}
+- STABLE: {{stable_achieved}}
+- Project Sync: {{project_sync_state}}
 
 ---
 
 ## Warnings
 
-- Loop Risk: {{low/medium/high}}
-- Token Usage: {{safe/warning/critical}}
+- Warning Risk: {{risk_warnings}}
+- Token Status: {{token_status}}
+- Open Warning Count: {{warning_count}}
+- Latest Warning: {{warning_latest}}

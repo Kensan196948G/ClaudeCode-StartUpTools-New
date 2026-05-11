@@ -1,14 +1,12 @@
 # Token Usage Dashboard
 
-Tracks token usage for the week.
-
-# Token Usage Dashboard
+Auto-generated from state.json by `scripts/dashboards/render.js`.
 
 ## Current Usage
 
-- Session Usage: {{tokens}}
-- Daily Usage: {{tokens}}
-- Weekly Usage: {{tokens}}
+- Session Tokens Used: {{token_session_used}}
+- Session Tokens Remaining: {{token_session_remaining}}
+- Session Usage %: {{token_session_pct}}
 
 ---
 
@@ -17,25 +15,27 @@ Tracks token usage for the week.
 - Safe Zone: < 70%
 - Warning: 70-90%
 - Critical: > 90%
+- Current Status: {{token_status}}
 
 ---
 
 ## Forecast
 
-- Estimated Remaining: {{tokens}}
-- Expected End Time: {{time}}
+- Estimated Remaining Time: {{remaining_hm}}
+- Expected End Time: {{session_end_planned}}
 
 ---
 
 ## Control
 
-- Token Budget: {{limit}}
-- Consumption Rate: {{rate}}
+- Token Budget Mode: {{token_budget_mode}}
+- Auto-Compact Threshold: {{token_autocompact_pct}}
 
 ---
 
 ## Action
 
-- Normal: Continue
-- Warning: Optimize prompts
-- Critical: Stop or reduce workload
+- Normal: Continue Improvement Loop
+- Warning: Stop Improvement / Verify Priority
+- Critical: Safe Shutdown
+- Current Recommended: {{token_recommendation}}
