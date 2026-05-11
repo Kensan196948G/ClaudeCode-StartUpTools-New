@@ -1,53 +1,60 @@
 # Daily Development Status
 
-Shows project progress.
-
-# Daily Development Status
+Shows project progress. Auto-generated from state.json by `scripts/dashboards/render.js`.
 
 ## Progress
 
-- Current Status: {{Development/Verify/etc}}
-- Current Task: {{task}}
-- Completion: {{%}}
+- Project: {{project_name}}
+- Current Phase: {{exec_phase}}
+- Current Task: {{exec_summary}}
+- Session Progress: {{session_progress_pct}}
 
 ---
 
 ## Loop Status
 
-- Monitor: Done / Running
-- Development: Running
-- Verify: Pending
-- Improvement: Pending
+- Active Loop: {{exec_phase}}
+- Session Start: {{session_start_at}}
+- Elapsed: {{elapsed_hm}}
+- Remaining: {{remaining_hm}}
 
 ---
 
 ## CI Status
 
-- Last Build: {{success/fail}}
-- Retry Count: {{n}}
-- Auto Repair: {{active/inactive}}
+- Last Build: {{ci_last_result}}
+- Retry Count: {{ci_retry_count}} / 15
+- Auto Repair: {{ci_auto_repair_state}}
 
 ---
 
 ## STABLE Tracking
 
-- Current Success Count: {{n}}
-- Required: {{N}}
-- STABLE: {{yes/no}}
+- Consecutive Success: {{stable_consecutive}}
+- Required: {{stable_target_n}}
+- STABLE Achieved: {{stable_achieved}}
+- Last STABLE PR: {{stable_last_pr}}
 
 ---
 
-## Agent Activity
+## Agent / Skill Usage (current session)
 
-- CTO: {{active/idle}}
-- Dev: {{active/idle}}
-- QA: {{active/idle}}
-- Security: {{active/idle}}
-- DevOps: {{active/idle}}
+- Total Agent Calls: {{agent_total_calls}}
+- Total Skill Calls: {{skill_total_calls}}
+- Top Agent: {{agent_top}}
+- Top Skill: {{skill_top}}
 
 ---
 
-## Issues
+## Warnings
 
-- Open: {{n}}
-- Blocked: {{n}}
+- Open Warnings: {{warning_count}}
+- Latest: {{warning_latest}}
+
+---
+
+## Git
+
+- Branch: {{git_branch}}
+- HEAD: {{git_head}}
+- Worktree: {{git_dirty}}
