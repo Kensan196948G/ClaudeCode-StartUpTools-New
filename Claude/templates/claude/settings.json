@@ -19,6 +19,17 @@
     "mode": "auto"
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/pre-commit-gate.js"
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "*",
@@ -54,11 +65,29 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Agent",
+        "matcher": "Agent|Skill",
         "hooks": [
           {
             "type": "command",
             "command": "node .claude/claudeos/scripts/hooks/usage-tracker.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/agent-transcript.js"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/auto-format.js"
           }
         ]
       }

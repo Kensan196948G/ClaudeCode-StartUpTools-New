@@ -40,7 +40,6 @@ function recordAgent(state, toolInput) {
 }
 
 function recordSkill(state, toolInput) {
-  // Skill ツールの input は { skill: "name" or "plugin:name", args?: "..." }
   const rawName = toolInput.skill || toolInput.skill_name || toolInput.name || "";
   if (!rawName) return null;
   const skillKey = String(rawName).replace(/[^a-zA-Z0-9_:.\-]/g, "_");
