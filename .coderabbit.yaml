@@ -1,0 +1,134 @@
+# CodeRabbit プロジェクト設定 (ClaudeOS v8.2.5+)
+# 配置先: 各登録プロジェクトの .coderabbit.yaml (リポジトリルート直下)
+# ドキュメント: https://docs.coderabbit.ai/reference/configuration
+
+# レビュー対象言語（自動検出に加えて明示）
+language: "ja-JP"
+early_access: false
+
+reviews:
+  profile: "chill"  # nitpicky に近いが過剰指摘を抑える
+  request_changes_workflow: false
+
+  # 重大度別の対応規則を ClaudeOS §8.5 と揃える
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+
+  # 自動レビュー範囲
+  auto_review:
+    enabled: true
+    drafts: false  # Draft PR はスキップ
+    base_branches:
+      - main
+      - master
+      - develop
+    # ベースブランチへの自動 trigger
+    auto_incremental_review: true
+
+  # path-based フィルタリング
+  path_filters:
+    # 自動生成ファイル・大規模成果物をレビュー対象外に
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/poetry.lock"
+    - "!**/go.sum"
+    - "!**/Cargo.lock"
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/node_modules/**"
+    - "!**/vendor/**"
+    - "!**/.next/**"
+    - "!**/__pycache__/**"
+    - "!**/coverage/**"
+    - "!**/reports/**"
+    - "!**/.playwright-mcp/**"
+    - "!**/test-results/**"
+    - "!**/*.min.js"
+    - "!**/*.min.css"
+    # ドキュメント差分は別途扱う
+    - "**/*.md"
+    - "**/CHANGELOG.md"
+    - "**/RELEASE_NOTES.md"
+
+  path_instructions:
+    - path: "**/*.{ts,tsx,js,jsx}"
+      instructions: |
+        TypeScript / JavaScript レビュー観点:
+        - 型安全 (any の濫用回避)
+        - async/await の例外処理
+        - Promise.all 化可能な逐次 await を指摘
+        - hot path の JSON.parse/stringify を指摘
+    - path: "**/*.py"
+      instructions: |
+        Python レビュー観点:
+        - 型ヒント整合性
+        - N+1 query / ループ内 I/O
+        - context manager の漏れ
+    - path: "**/*.go"
+      instructions: |
+        Go レビュー観点:
+        - error wrap の徹底
+        - goroutine leak と context cancellation
+        - mutex の使い分け
+    - path: ".claude/claudeos/scripts/hooks/**/*.js"
+      instructions: |
+        ClaudeOS hook レビュー観点:
+        - fail-soft 設計の維持 (hook 失敗が本処理をブロックしない)
+        - state.json への並列書き込み race 対策 (atomic write)
+        - stdin から hookData JSON を読む際の壊れ JSON 耐性
+    - path: "scripts/release/**/*.js"
+      instructions: |
+        release script レビュー観点:
+        - git log / git tag の境界条件 (タグ無し / 履歴 0 件 / バイナリ差分)
+        - 出力ファイルの上書きリスク (CHANGELOG.md は append のみ)
+    - path: "**/SKILL.md"
+      instructions: |
+        Skill 文書レビュー観点:
+        - 「使う場面」「想定入力」「期待する出力」が具体的か
+        - 標準手順がチェックリストとして機能するか
+    - path: "CLAUDE.md"
+      instructions: |
+        ClaudeOS ガバナンス文書レビュー観点:
+        - §6 Agent ログフォーマットとアイコン規約の整合
+        - §7 Issue Factory 生成条件の重複/曖昧排除
+        - template ↔ root のドリフトを指摘
+
+  # tool-level チェック
+  tools:
+    actionlint:
+      enabled: true
+    biome:
+      enabled: true
+    eslint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    hadolint:
+      enabled: true
+    languagetool:
+      enabled: false  # 日本語誤検知が多いため停止
+    markdownlint:
+      enabled: true
+    ruff:
+      enabled: true
+    semgrep:
+      enabled: true
+    shellcheck:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  # ClaudeOS の用語集
+  learnings:
+    scope: "auto"
+  pull_requests:
+    scope: "auto"
+
+# レビュー対象外パスのデフォルト無効化
+ignore_dot_files: false

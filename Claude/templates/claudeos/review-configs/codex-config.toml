@@ -1,0 +1,69 @@
+# Codex CLI プロジェクト設定 (ClaudeOS v8.2.5+)
+# 配置先: 各登録プロジェクトの .codex/config.toml
+# 設定は ~/.codex/config.toml (グローバル) を上書きする
+# 機密情報を含むためコミット禁止: .gitignore で `.codex/config.toml` を除外
+
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+
+# Codex がアクセスを許可されるディレクトリ
+[shell_environment_policy]
+inherit = "core"
+
+# プロジェクト固有プロファイル
+[profiles.default]
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[profiles.review]
+# /codex:review 用の安全プロファイル
+approval_policy = "never"
+sandbox_mode = "read-only"
+model_reasoning_effort = "high"
+
+[profiles.adversarial]
+# /codex:adversarial-review 用 (リリース前最終確認)
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+model_reasoning_effort = "high"
+
+[profiles.rescue]
+# /codex:rescue 用 (debug 深掘り)
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "high"
+
+[profiles.full_auto]
+# 自律実行用 (Linux cron)
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+
+# Windows pwsh シェル
+[shell]
+program = "pwsh.exe"
+args = [
+  "-NoLogo",
+  "-NoProfile",
+  "-NonInteractive",
+]
+
+# Git safe.directory 設定 (cross-platform / network share)
+[git]
+safe_directories = [
+  "*",  # 必要なら個別ディレクトリに絞る
+]
+
+# レビュー時の挙動
+[review]
+# adversarial-review は authentication / authorization / DB schema 変更を強調
+emphasize_security = true
+# レビュー対象から除外するファイル
+exclude_paths = [
+  "**/node_modules/**",
+  "**/dist/**",
+  "**/build/**",
+  "**/.next/**",
+  "**/*.lock",
+  "**/package-lock.json",
+  "**/reports/**",
+]
