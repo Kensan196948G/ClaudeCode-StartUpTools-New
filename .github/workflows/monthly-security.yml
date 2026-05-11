@@ -106,7 +106,7 @@ jobs:
           " 2>&1 | tee kpi-report.txt
 
       - name: Upload KPI report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: monthly-kpi-report-${{ github.run_id }}
           path: kpi-report.txt
