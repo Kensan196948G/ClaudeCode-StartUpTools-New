@@ -21,7 +21,28 @@
 loop および schedule コマンドによるクラウドスケジュール登録は不要。
 このステップはスキップしてステップ 2 へ直ちに進むこと。
 
-### ステップ 2: Codex セットアップ（任意）
+### ステップ 2: Review Tools 一括診断（v8.2.5+）
+
+Codex / CodeRabbit のセットアップ状態を一括診断する:
+
+```
+node scripts/setup/install-review-tools.js
+```
+
+不足分の自動配布:
+
+```
+node scripts/setup/install-review-tools.js --apply
+```
+
+これにより以下が配置される:
+- 🐰 `.coderabbit.yaml` (CodeRabbit プロジェクト設定)
+- 🛡️ `.codex/config.toml.example` (Codex プロジェクト設定テンプレ)
+- 🔧 `.gitignore` への `.codex/config.toml` 除外追記
+
+詳細手順: `Claude/templates/claudeos/review-configs/README.md`
+
+### ステップ 2.1: Codex セットアップ（任意）
 
 Codex が利用可能な場合のみ実行する。**Codex が使えなくても自律開発は止めない。**
 
