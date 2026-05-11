@@ -1,0 +1,41 @@
+{
+  "_comment": "AgentTeams managed-agents 設定テンプレート。コピーして config/managed-agents.json に保存し、各 ID を埋めて使う。API キーは必ず環境変数 ANTHROPIC_API_KEY 経由とし、このファイルには絶対に書かない。",
+  "_security": "config/managed-agents.json は .gitignore で除外済み。万一コミットしないこと。",
+  "memoryStoreId": "memstore_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "environmentId": "env_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "specialistAgents": {
+    "architect": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-Architect"
+    },
+    "developer": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-Developer"
+    },
+    "qa": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-QA"
+    },
+    "security": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-Security"
+    },
+    "devops": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-DevOps"
+    },
+    "reviewer": {
+      "id": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+      "version": 1,
+      "name": "ClaudeOS-Reviewer"
+    }
+  },
+  "orchestratorId": "agent_xxxxxxxxxxxxxxxxxxxxxxxx",
+  "orchestratorVersion": 1,
+  "lastSessionId": null
+}

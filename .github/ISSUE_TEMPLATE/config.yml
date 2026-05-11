@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: バグ報告
+    url: https://github.com/Kensan196948G/Claude-EdgeChromeDevTools/issues/new?template=bug_report.md
+    about: 不具合報告（再現手順・環境を含む）
+  - name: 機能追加リクエスト
+    url: https://github.com/Kensan196948G/Claude-EdgeChromeDevTools/issues/new?template=feature_request.md
+    about: 新機能・拡張提案（受け入れ基準を含む）
+  - name: タスク
+    url: https://github.com/Kensan196948G/Claude-EdgeChromeDevTools/issues/new?template=task.md
+    about: リファクタ・改善・docs などの作業
