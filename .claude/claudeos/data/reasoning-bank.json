@@ -41,8 +41,29 @@
       "ci_passed": true,
       "consecutive_success": 5,
       "confidence": 1,
-      "used_count": 9,
-      "last_used": "2026-05-11T12:22:24.654Z"
+      "used_count": 11,
+      "last_used": "2026-05-11T12:29:59.083Z"
+    },
+    {
+      "id": "rb-2026-05-12T09-05-22-1qf6",
+      "timestamp": "2026-05-12T09:05:22.255Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 1,
+      "used_count": 1,
+      "last_used": "2026-05-12T09:23:05.421Z"
     }
   ]
 }
