@@ -274,6 +274,7 @@ function Show-Menu {
         "12  📊 Statusline 設定",
         "13  📡 Claude ログ監視タブを開く",
         "D   🌐 Projects Dashboard (進捗 WebUI)",
+        "MC  🎛️  Mission Control (統合管理コンソール)",
         "DR  📌 Dashboard をタスクスケジューラーに登録（自動起動）",
         "DU  🗑️  Dashboard タスクを解除"
     ) | ForEach-Object { Write-Host "    $_" -ForegroundColor Magenta }
@@ -412,6 +413,14 @@ while ($true) {
         }
         "14" { Invoke-MenuScript -File "scripts\main\New-CronSchedule.ps1" }
         "D"  { Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" }
+        "MC" {
+            $env:AI_STARTUP_PROJECTS_DIR = $Config.projectsDir
+            Start-Process "http://localhost:3737/mission-control"
+            Write-Host "[MC] Mission Control: http://localhost:3737/mission-control" -ForegroundColor Cyan
+            if (-not (Get-NetTCPConnection -LocalPort 3737 -ErrorAction SilentlyContinue)) {
+                Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" -ScriptArgs @('-NoBrowser')
+            }
+        }
         "DR" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-RunNow') }
         "DU" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-Unregister') }
         "15" {

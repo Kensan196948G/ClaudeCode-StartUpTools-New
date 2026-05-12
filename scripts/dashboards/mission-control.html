@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1440" />
+  <title>ClaudeOS v9.0 — Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+    body {
+      background: #080c14;
+      color: #e2e8f0;
+      font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    @keyframes mcPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+    @keyframes mcFadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    input:focus { border-color: #00d4ff !important; outline: none; }
+    button { font-family: inherit; }
+    code { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 1: Tweaks Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const __TWEAKS_STYLE = `
+  .twk-panel{position:fixed;right:16px;bottom:16px;z-index:2147483646;width:280px;
+    max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+    background:rgba(250,249,247,.78);color:#29261b;
+    -webkit-backdrop-filter:blur(24px) saturate(160%);backdrop-filter:blur(24px) saturate(160%);
+    border:.5px solid rgba(255,255,255,.6);border-radius:14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 12px 40px rgba(0,0,0,.18);
+    font:11.5px/1.4 ui-sans-serif,system-ui,-apple-system,sans-serif;overflow:hidden}
+  .twk-hd{display:flex;align-items:center;justify-content:space-between;
+    padding:10px 8px 10px 14px;cursor:move;user-select:none}
+  .twk-hd b{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .twk-x{appearance:none;border:0;background:transparent;color:rgba(41,38,27,.55);
+    width:22px;height:22px;border-radius:6px;cursor:default;font-size:13px;line-height:1}
+  .twk-x:hover{background:rgba(0,0,0,.06);color:#29261b}
+  .twk-body{padding:2px 14px 14px;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden;min-height:0}
+  .twk-row{display:flex;flex-direction:column;gap:5px}
+  .twk-row-h{flex-direction:row;align-items:center;justify-content:space-between;gap:10px}
+  .twk-lbl{display:flex;justify-content:space-between;align-items:baseline;
+    color:rgba(41,38,27,.72)}
+  .twk-lbl>span:first-child{font-weight:500}
+  .twk-sect{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+    color:rgba(41,38,27,.45);padding:10px 0 0}
+  .twk-sect:first-child{padding-top:0}
+  .twk-field{appearance:none;box-sizing:border-box;width:100%;min-width:0;height:26px;padding:0 8px;
+    border:.5px solid rgba(0,0,0,.1);border-radius:7px;
+    background:rgba(255,255,255,.6);color:inherit;font:inherit;outline:none}
+  select.twk-field{padding-right:22px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='rgba(0,0,0,.5)' d='M0 0h10L5 6z'/></svg>");background-repeat:no-repeat;background-position:right 8px center}
+  .twk-toggle{position:relative;width:32px;height:18px;border:0;border-radius:999px;
+    background:rgba(0,0,0,.15);transition:background .15s;cursor:default;padding:0}
+  .twk-toggle[data-on="1"]{background:#34c759}
+  .twk-toggle i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+  .twk-toggle[data-on="1"] i{transform:translateX(14px)}
+  .twk-chips{display:flex;gap:6px}
+  .twk-chip{position:relative;appearance:none;flex:1;min-width:0;height:46px;
+    padding:0;border:0;border-radius:6px;overflow:hidden;cursor:default;
+    box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 1px 2px rgba(0,0,0,.06)}
+  .twk-chip[data-on="1"]{box-shadow:0 0 0 1.5px rgba(0,0,0,.85),0 2px 6px rgba(0,0,0,.15)}
+  .twk-chip svg{position:absolute;top:6px;left:6px;width:13px;height:13px;filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
+`;
+
+function useTweaks(defaults) {
+  const [values, setValues] = React.useState(defaults);
+  const setTweak = React.useCallback((keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues((prev) => ({ ...prev, ...edits }));
+  }, []);
+  return [values, setTweak];
+}
+
+function TweaksPanel({ title = 'Tweaks', children }) {
+  const [open, setOpen] = React.useState(false);
+  const dragRef = React.useRef(null);
+  const offsetRef = React.useRef({ x: 16, y: 16 });
+  React.useEffect(() => {
+    const onMsg = (e) => {
+      const t = e?.data?.type;
+      if (t === '__activate_edit_mode') setOpen(true);
+      else if (t === '__deactivate_edit_mode') setOpen(false);
+    };
+    window.addEventListener('message', onMsg);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', onMsg);
+  }, []);
+  if (!open) return null;
+  return (
+    <>
+      <style>{__TWEAKS_STYLE}</style>
+      <div ref={dragRef} className="twk-panel" style={{ right: offsetRef.current.x, bottom: offsetRef.current.y }}>
+        <div className="twk-hd">
+          <b>{title}</b>
+          <button className="twk-x" onClick={() => setOpen(false)}>✕</button>
+        </div>
+        <div className="twk-body">{children}</div>
+      </div>
+    </>
+  );
+}
+function TweakSection({ label, children }) { return (<><div className="twk-sect">{label}</div>{children}</>); }
+function TweakToggle({ label, value, onChange }) {
+  return (
+    <div className="twk-row twk-row-h">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <button type="button" className="twk-toggle" data-on={value ? '1' : '0'}
+              onClick={() => onChange(!value)}><i /></button>
+    </div>
+  );
+}
+function TweakSelect({ label, value, options, onChange }) {
+  return (
+    <div className="twk-row">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <select className="twk-field" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => {
+          const v = typeof o === 'object' ? o.value : o;
+          const l = typeof o === 'object' ? o.label : o;
+          return <option key={v} value={v}>{l}</option>;
+        })}
+      </select>
+    </div>
+  );
+}
+function TweakColor({ label, value, options, onChange }) {
+  if (!options || !options.length) return null;
+  const key = (o) => String(JSON.stringify(o)).toLowerCase();
+  const cur = key(value);
+  return (
+    <div className="twk-row">
+      <div className="twk-lbl"><span>{label}</span></div>
+      <div className="twk-chips">
+        {options.map((o, i) => {
+          const colors = Array.isArray(o) ? o : [o];
+          const [hero] = colors;
+          const on = key(o) === cur;
+          return (
+            <button key={i} type="button" className="twk-chip" data-on={on ? '1' : '0'}
+                    style={{ background: hero, flex: 1, height: 32 }}
+                    onClick={() => onChange(o)} />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+Object.assign(window, { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakSelect, TweakColor });
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 2: Data Layer
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const MOCK_STATE = {
+  goal: { title: "ClaudeOS v9.0 自律開発最適化 — 全テスト PASS・CI安定・STABLE達成" },
+  project: { name: "ClaudeCode-StartUpTools-New", registration_date: "2026-01-15", release_deadline: null, phase_mode: "development", cron_enabled: true, session_max_minutes: 300, version: "v3.2.107" },
+  kpi: { success_rate_target: 0.9, ci_success_rate: 0.96, test_pass_rate: 1.0, security_critical: 0, blocker_count: 0 },
+  execution: { start_time: new Date(Date.now() - 142*60000).toISOString(), max_duration_minutes: 300, elapsed_minutes: 142, remaining_minutes: 158, phase: "Development", last_stop_at: new Date(Date.now() - 86400000).toISOString(), current_session_prs: ["#241","#242"], current_session_last_pr: "#242" },
+  stable: { consecutive_success: 2, target_n: 3, last_verified_at: new Date(Date.now() - 3600000).toISOString(), stable_achieved: false },
+  token: { total_budget: 100, used: 38, remaining: 62, allocation: { monitor: 10, development: 35, verify: 25, improvement: 15, debug: 10, release: 5 }, current_phase_budget: 35, current_phase_used: 14 },
+  automation: { auto_issue_generation: true, self_evolution: true },
+  learning: { usage_history: { agents: { "security-reviewer": { call_count: 12 }, "e2e-runner": { call_count: 8 }, "tester": { call_count: 15 } } } },
+  debug: { last_failure_category: null, same_error_retry_count: 0, rescue_retry_count: 0, flaky_suspected: false },
+  compact: { trigger_at_pct: 70, last_pre_compact_at: new Date(Date.now() - 7200000).toISOString() }
+};
+
+const AGENTS_DATA = [
+  { id: "cto", icon: "👔", name: "CTO", nameJa: "最高技術責任者", status: "working", domain: "Orchestration", lastAction: "Agent Teams パターンA 起動判断", time: "2m前" },
+  { id: "architect", icon: "🏛️", name: "Architect", nameJa: "アーキテクト", status: "working", domain: "Design", lastAction: "モジュール分割設計レビュー", time: "5m前" },
+  { id: "developer", icon: "💻", name: "Developer", nameJa: "デベロッパー", status: "working", domain: "Development", lastAction: "v3.2.107 WebUI検証項目追加", time: "1m前" },
+  { id: "qa", icon: "🧪", name: "QA", nameJa: "品質保証", status: "idle", domain: "Testing", lastAction: "776件テスト全PASS確認", time: "15m前" },
+  { id: "reviewer", icon: "🔍", name: "Reviewer", nameJa: "レビュアー", status: "completed", domain: "Quality", lastAction: "PR #242 差分レビュー完了", time: "8m前" },
+  { id: "security", icon: "🔒", name: "Security", nameJa: "セキュリティ", status: "idle", domain: "Quality", lastAction: "secret漏洩スキャン OK", time: "20m前" },
+  { id: "devops", icon: "⚙️", name: "DevOps", nameJa: "運用基盤", status: "working", domain: "Operations", lastAction: "CI パイプライン監視中", time: "3m前" },
+  { id: "debugger", icon: "🐛", name: "Debugger", nameJa: "デバッガー", status: "idle", domain: "Development", lastAction: "待機中", time: "" },
+  { id: "analyst", icon: "📊", name: "Analyst", nameJa: "アナリスト", status: "completed", domain: "Operations", lastAction: "KPI分析レポート生成", time: "12m前" },
+  { id: "evolution-mgr", icon: "🧬", name: "EvolutionManager", nameJa: "進化マネージャー", status: "idle", domain: "Orchestration", lastAction: "改善提案 3件登録", time: "30m前" },
+  { id: "release-mgr", icon: "🚀", name: "ReleaseManager", nameJa: "リリースマネージャー", status: "idle", domain: "Orchestration", lastAction: "待機中", time: "" },
+  { id: "product-mgr", icon: "📋", name: "ProductManager", nameJa: "プロダクトマネージャー", status: "idle", domain: "Orchestration", lastAction: "Issue整理完了", time: "25m前" },
+  { id: "cmdb", icon: "🗄️", name: "CMDB-Agent", nameJa: "構成管理", status: "idle", domain: "Infrastructure", lastAction: "構成アイテム台帳更新", time: "40m前" },
+  { id: "audit", icon: "📋", name: "Audit-Agent", nameJa: "監査", status: "idle", domain: "Infrastructure", lastAction: "変更証跡確認完了", time: "35m前" },
+  { id: "sec-reviewer", icon: "🛡️", name: "security-reviewer", nameJa: "セキュリティレビュアー", status: "completed", domain: "Quality", lastAction: "XSS/CSRF/IDOR チェック完了", time: "10m前" },
+  { id: "e2e-runner", icon: "🎭", name: "e2e-runner", nameJa: "E2Eテスト実行", status: "idle", domain: "Testing", lastAction: "E2Eコアテスト PASS", time: "18m前" },
+  { id: "tester", icon: "✅", name: "tester", nameJa: "テスター", status: "idle", domain: "Testing", lastAction: "776件全PASS", time: "15m前" },
+];
+
+const CI_WORKFLOWS = [
+  { name: "ci.yml", displayName: "CI (Pester + Lint)", status: "success", duration: "4m32s", commit: "dea6643", branch: "main", time: "2h前", tests: 776 },
+  { name: "security-scan.yml", displayName: "Security Scan (gitleaks)", status: "success", duration: "1m15s", commit: "dea6643", branch: "main", time: "2h前" },
+  { name: "issue-sync.yml", displayName: "Issue Sync", status: "success", duration: "0m45s", commit: "dea6643", branch: "main", time: "2h前" },
+  { name: "weekly-devops.yml", displayName: "Weekly DevOps", status: "success", duration: "8m22s", commit: "b5cc9c8", branch: "main", time: "3日前" },
+  { name: "monthly-security.yml", displayName: "Monthly Security Audit", status: "success", duration: "12m08s", commit: "ebe2045", branch: "main", time: "12日前" },
+  { name: "quarterly-review.yml", displayName: "Quarterly Review", status: "skipped", duration: "—", commit: "—", branch: "main", time: "未実行" },
+];
+
+const RECENT_PRS = [
+  { number: 277, title: "feat(v3.3): Projects Dashboard + セッションタイムライン + START_PROMPT 強化", status: "open", branch: "feat/dashboard-timeline-prompt-v3-3", checks: "passing", time: "1h前" },
+  { number: 276, title: "fix(v9.0): START_PROMPT _header/_footer v8.5→v9.0 修正・再ビルド", status: "merged", branch: "fix/start-prompt-v9", checks: "passed", time: "3h前" },
+  { number: 275, title: "feat(v9.0): 残タスク全対応 — state.json v9.0 / upgrade スクリプト", status: "merged", branch: "feat/v9-tasks", checks: "passed", time: "1日前" },
+  { number: 274, title: "chore(deps): Bump actions/setup-node from 4 to 6", status: "merged", branch: "dependabot/setup-node", checks: "passed", time: "2日前" },
+];
+
+const OPEN_ISSUES = [
+  { number: 278, title: "WebUI Mission Control 実装", labels: ["P1", "enhancement"], assignee: "Developer", time: "30m前" },
+  { number: 243, title: "Gate-3 リリース前 Staging 全250項目実行環境構築", labels: ["P2", "enhancement"], assignee: "Developer", time: "1h前" },
+  { number: 244, title: "E2E Playwright テスト CI 統合", labels: ["P2", "testing"], assignee: "QA", time: "2h前" },
+  { number: 245, title: "dependency minor update (2026-05)", labels: ["P3", "maintenance"], assignee: "DevOps", time: "1日前" },
+];
+
+const CRON_SCHEDULES = [
+  { project: "ClaudeCode-StartUpTools-New", host: "linux-dev-01", schedule: "0 9 * * 1-6", duration: 300, status: "active", lastRun: "2026-05-12 09:00", nextRun: "2026-05-13 09:00", result: "success" },
+  { project: "ActiveDirectory-Entry-Tools", host: "linux-dev-01", schedule: "0 14 * * 1,3,5", duration: 300, status: "active", lastRun: "2026-05-12 14:00", nextRun: "2026-05-14 14:00", result: "running" },
+  { project: "Construction-DX-One-System", host: "linux-dev-01", schedule: "0 22 * * 2,4", duration: 300, status: "active", lastRun: "2026-05-08 22:00", nextRun: "2026-05-13 22:00", result: "success" },
+  { project: "Enterprise-AI-HelpDesk-System", host: "linux-dev-02", schedule: "0 10 * * 1-6", duration: 300, status: "active", lastRun: "2026-05-12 10:00", nextRun: "2026-05-13 10:00", result: "success" },
+  { project: "PC-Ops-Orchestrator", host: "linux-dev-02", schedule: "30 6 * * 1-5", duration: 300, status: "paused", lastRun: "2026-05-09 06:30", nextRun: "—", result: "failed" },
+];
+
+const BOOT_STEPS = [
+  { step: 1, name: "環境検証", nameEn: "Environment Check", status: "completed", duration: "0.8s", detail: "PowerShell 7.4 / Node 20 / Git 2.44" },
+  { step: 2, name: "Review Tools診断", nameEn: "Review Tools Check", status: "completed", duration: "1.2s", detail: "CodeRabbit ✓ / Codex optional" },
+  { step: 3, name: "Memory復元", nameEn: "Memory Restore", status: "completed", duration: "2.1s", detail: "MCP Health OK / state.json loaded" },
+  { step: 4, name: "設定読み込み", nameEn: "Config Load", status: "completed", duration: "0.3s", detail: "config.json v3.2.0 parsed" },
+  { step: 5, name: "Executive初期化", nameEn: "Executive Init", status: "completed", duration: "1.5s", detail: "CTO / PM / Analyst spawned" },
+  { step: 6, name: "Management初期化", nameEn: "Management Init", status: "completed", duration: "1.8s", detail: "Token Budget / Loop Guard active" },
+  { step: 7, name: "Agent初期化", nameEn: "Agent Init", status: "completed", duration: "3.2s", detail: "28体 Agent Teams ready" },
+  { step: 8, name: "ループエンジン起動", nameEn: "Loop Engine Start", status: "running", duration: "—", detail: "Monitor → Development 進行中" },
+  { step: 9, name: "ダッシュボード", nameEn: "Dashboard", status: "running", duration: "—", detail: "KPI表示・リアルタイム監視中" },
+];
+
+const PHASE_TIMELINE = [
+  { phase: "Monitor", icon: "🔍", duration: 30, color: "#00b4d8", status: "completed", startMin: 0 },
+  { phase: "Development", icon: "🛠", duration: 120, color: "#00d4aa", status: "active", startMin: 30 },
+  { phase: "Verify", icon: "✅", duration: 75, color: "#f4a261", status: "pending", startMin: 150 },
+  { phase: "Improve", icon: "🚀", duration: 75, color: "#9b5de5", status: "pending", startMin: 225 },
+];
+
+const EVENT_LOG = [
+  { time: "09:00:00", agent: "👔 CTO", message: "セッション開始 — /goal 設定完了", type: "info" },
+  { time: "09:00:02", agent: "⚙️ System", message: "Boot Sequence Step 1-7 完了 (10.9s)", type: "success" },
+  { time: "09:01:15", agent: "📊 Analyst", message: "前回セッション KPI 読み込み: CI 96% / Test 100%", type: "info" },
+  { time: "09:05:00", agent: "🔍 Monitor", message: "GitHub Issues 4件 / PR 1件 open 検出", type: "info" },
+  { time: "09:08:30", agent: "👔 CTO", message: "優先順位判断: P1 → Mission Control WebUI実装", type: "decision" },
+  { time: "09:30:00", agent: "👔 CTO", message: "Monitor → Development フェーズ遷移", type: "phase" },
+  { time: "09:32:00", agent: "🏛️ Architect", message: "設計: Mission Control HTML 単一ファイル構成決定", type: "info" },
+  { time: "09:45:00", agent: "💻 Developer", message: "mission-control.html 実装開始（6パネル構成）", type: "info" },
+  { time: "10:20:00", agent: "🧪 QA", message: "テスト実行: Pester 全PASS ✓", type: "success" },
+  { time: "10:35:00", agent: "🔍 Reviewer", message: "PR #277 差分レビュー: 問題なし", type: "success" },
+  { time: "10:42:00", agent: "🛡️ security-reviewer", message: "XSS/CSRF/IDOR チェック完了: 0件検出", type: "success" },
+  { time: "10:50:00", agent: "⚙️ DevOps", message: "CI パイプライン: SUCCESS", type: "success" },
+  { time: "11:00:00", agent: "📊 Analyst", message: "KPI更新: STABLE 2/3 — あと1回で達成", type: "info" },
+];
+
+Object.assign(window, { MOCK_STATE, AGENTS_DATA, CI_WORKFLOWS, RECENT_PRS, OPEN_ISSUES, CRON_SCHEDULES, BOOT_STEPS, PHASE_TIMELINE, EVENT_LOG });
+
+// 実データフェッチ（サーバーが /api/mc-data を提供している場合）
+fetch('/api/mc-data').then(r => r.json()).then(data => {
+  if (data.state) Object.assign(window.MOCK_STATE, data.state);
+  if (data.cronSchedules) window.CRON_SCHEDULES = data.cronSchedules;
+  if (data.workflows) window.CI_WORKFLOWS = data.workflows;
+  if (data.prs) window.RECENT_PRS = data.prs;
+  if (data.issues) window.OPEN_ISSUES = data.issues;
+}).catch(() => { /* モックデータで継続 */ });
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 3: Shell & Navigation (theme, TopBar, SideNav, shared components)
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const THEME_DARK = {
+  bg: "#080c14", bgPanel: "#0d1320", bgCard: "#111827", border: "#1e293b", borderHi: "#334155",
+  text: "#e2e8f0", textDim: "#94a3b8", textMuted: "#64748b",
+  accent: "#00d4ff", accentDim: "#0891b2", green: "#00ff88", greenDim: "#059669",
+  amber: "#fbbf24", amberDim: "#d97706", red: "#ff4444", redDim: "#dc2626",
+  purple: "#a78bfa", cyan: "#22d3ee",
+};
+const THEME_LIGHT = {
+  bg: "#f0f2f5", bgPanel: "#ffffff", bgCard: "#f8f9fb", border: "#d4d9e1", borderHi: "#b0b8c4",
+  text: "#1a202c", textDim: "#4a5568", textMuted: "#718096",
+  accent: "#0891b2", accentDim: "#06718a", green: "#059669", greenDim: "#047857",
+  amber: "#d97706", amberDim: "#b45309", red: "#dc2626", redDim: "#b91c1c",
+  purple: "#7c3aed", cyan: "#0891b2",
+};
+window.THEME_DARK = THEME_DARK;
+window.THEME_LIGHT = THEME_LIGHT;
+
+const MC = {
+  ...THEME_DARK,
+  mono: "'JetBrains Mono', 'Fira Code', monospace",
+  sans: "'Inter', -apple-system, 'Segoe UI', sans-serif",
+};
+window.MC = MC;
+
+function applyTheme(isDark) {
+  const palette = isDark ? THEME_DARK : THEME_LIGHT;
+  Object.assign(MC, palette);
+  document.body.style.background = MC.bg;
+  document.body.style.color = MC.text;
+}
+window.applyTheme = applyTheme;
+
+function formatDuration(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+function formatTime(iso) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+}
+window.formatDuration = formatDuration;
+window.formatTime = formatTime;
+
+function StatusDot({ status, size = 8 }) {
+  const colors = {
+    working: MC.green, active: MC.green, running: MC.green, success: MC.green, open: MC.green,
+    completed: MC.accent, merged: MC.purple, passed: MC.accent,
+    idle: MC.textMuted, pending: MC.textMuted, paused: MC.textMuted, skipped: MC.textMuted,
+    failed: MC.red, error: MC.red, "needs-input": MC.amber,
+  };
+  const c = colors[status] || MC.textMuted;
+  const pulse = status === "working" || status === "running" || status === "active";
+  return (
+    <span style={{ display:"inline-block", position:"relative", width:size, height:size, flexShrink:0 }}>
+      <span style={{
+        display:"block", width:size, height:size, borderRadius:"50%", background:c,
+        boxShadow: pulse ? `0 0 ${size}px ${c}` : "none",
+        animation: pulse ? "mcPulse 2s ease-in-out infinite" : "none",
+      }} />
+    </span>
+  );
+}
+window.StatusDot = StatusDot;
+
+function Gauge({ value, max = 100, size = 80, strokeWidth = 6, color, label, sublabel }) {
+  const pct = Math.min(value / max, 1);
+  const r = (size - strokeWidth) / 2;
+  const circ = 2 * Math.PI * r;
+  const c = color || (pct > 0.8 ? MC.green : pct > 0.5 ? MC.accent : pct > 0.25 ? MC.amber : MC.red);
+  return (
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+      <svg width={size} height={size} style={{ transform:"rotate(-90deg)" }}>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={MC.border} strokeWidth={strokeWidth} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={c} strokeWidth={strokeWidth}
+          strokeDasharray={circ} strokeDashoffset={circ * (1 - pct)} strokeLinecap="round"
+          style={{ transition:"stroke-dashoffset 1s ease" }} />
+      </svg>
+      <div style={{ marginTop:-size/2-12, textAlign:"center", height:size/2+12, display:"flex", flexDirection:"column", justifyContent:"center" }}>
+        <div style={{ fontSize:size/3.5, fontWeight:700, fontFamily:MC.mono, color:c }}>{Math.round(pct*100)}%</div>
+      </div>
+      {label && <div style={{ fontSize:11, color:MC.textDim, marginTop:2, textAlign:"center" }}>{label}</div>}
+      {sublabel && <div style={{ fontSize:10, color:MC.textMuted, textAlign:"center" }}>{sublabel}</div>}
+    </div>
+  );
+}
+window.Gauge = Gauge;
+
+function Panel({ title, icon, children, style, headerRight, noPad }) {
+  return (
+    <div style={{ background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, overflow:"hidden", display:"flex", flexDirection:"column", ...style }}>
+      {title && (
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 14px", borderBottom:`1px solid ${MC.border}`, background:"linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)" }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, fontWeight:600, color:MC.text }}>
+            {icon && <span style={{ fontSize:14 }}>{icon}</span>}
+            {title}
+          </div>
+          {headerRight}
+        </div>
+      )}
+      <div style={{ padding: noPad ? 0 : 14, flex:1, overflow:"auto" }}>{children}</div>
+    </div>
+  );
+}
+window.Panel = Panel;
+
+function Tag({ children, color, bg }) {
+  const c = color || MC.accent;
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, fontFamily:MC.mono, letterSpacing:"0.02em", color:c, background: bg || (c + "18"), border:`1px solid ${c}33` }}>{children}</span>
+  );
+}
+window.Tag = Tag;
+
+function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => { setNow(new Date()); setSessionElapsed(prev => prev + 1/60); }, 1000);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = state.execution.max_duration_minutes - sessionElapsed;
+  const remainH = Math.floor(remaining / 60);
+  const remainM = Math.floor(remaining % 60);
+  const remainS = Math.floor((remaining % 1) * 60);
+  const pctElapsed = sessionElapsed / state.execution.max_duration_minutes;
+  return (
+    <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:48, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, flexShrink:0, gap:16 }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+        <div style={{ width:28, height:28, borderRadius:6, display:"flex", alignItems:"center", justifyContent:"center", background:`linear-gradient(135deg, ${MC.accent}, ${MC.purple})`, fontSize:14, fontWeight:800 }}>C</div>
+        <div>
+          <div style={{ fontSize:13, fontWeight:700, color:MC.text, letterSpacing:"0.04em" }}>ClaudeOS <span style={{ color:MC.accent }}>v9.0</span></div>
+          <div style={{ fontSize:9, color:MC.textMuted, fontFamily:MC.mono }}>Mission Control</div>
+        </div>
+      </div>
+      <div style={{ flex:1, maxWidth:500, display:"flex", flexDirection:"column", gap:3 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", fontSize:10, fontFamily:MC.mono }}>
+          <span style={{ color:MC.textDim }}>セッション経過 {formatDuration(Math.floor(sessionElapsed))}</span>
+          <span style={{ color: remaining < 30 ? MC.red : remaining < 60 ? MC.amber : MC.accent }}>
+            残り {remainH}h {String(remainM).padStart(2,'0')}m {String(remainS).padStart(2,'0')}s
+          </span>
+        </div>
+        <div style={{ height:4, background:MC.border, borderRadius:2, overflow:"hidden" }}>
+          <div style={{ height:"100%", borderRadius:2, transition:"width 1s linear", width:`${Math.min(pctElapsed*100,100)}%`, background: pctElapsed > 0.9 ? MC.red : pctElapsed > 0.8 ? MC.amber : `linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} />
+        </div>
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <StatusDot status="working" />
+          <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>ACTIVE</span>
+        </div>
+        <div style={{ fontSize:11, fontFamily:MC.mono, color:MC.textDim }}>
+          Phase: <span style={{ color:"#00d4aa" }}>{state.execution.phase}</span>
+        </div>
+        <button onClick={onToggleDark} title={darkMode ? "ライトモード" : "ダークモード"}
+          style={{ width:34, height:34, borderRadius:8, border:`1px solid ${MC.border}`, background:MC.bgCard, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:16, color:MC.text }}
+          onMouseEnter={e => { e.currentTarget.style.background = MC.accent+"20"; e.currentTarget.style.borderColor = MC.accent; }}
+          onMouseLeave={e => { e.currentTarget.style.background = MC.bgCard; e.currentTarget.style.borderColor = MC.border; }}
+        >{darkMode ? "☀️" : "🌙"}</button>
+        <div style={{ fontSize:12, fontFamily:MC.mono, color:MC.text }}>{now.toLocaleTimeString("ja-JP")}</div>
+      </div>
+    </header>
+  );
+}
+window.TopBar = TopBar;
+
+const NAV_ITEMS = [
+  { id:"dashboard", icon:"📊", label:"ダッシュボード" },
+  { id:"agents",    icon:"🤖", label:"Agent Teams" },
+  { id:"cicd",      icon:"⚡", label:"CI / GitHub" },
+  { id:"cron",      icon:"🕐", label:"Cron管理" },
+  { id:"boot",      icon:"🚀", label:"Boot Sequence" },
+  { id:"log",       icon:"📜", label:"イベントログ" },
+];
+
+function SideNav({ active, onChange }) {
+  return (
+    <nav style={{ width:180, flexShrink:0, background:MC.bgPanel, borderRight:`1px solid ${MC.border}`, display:"flex", flexDirection:"column", padding:"12px 0" }}>
+      {NAV_ITEMS.map(item => {
+        const isActive = active === item.id;
+        return (
+          <button key={item.id} onClick={() => onChange(item.id)} style={{
+            display:"flex", alignItems:"center", gap:10, padding:"10px 16px",
+            background: isActive ? MC.accent+"12" : "transparent",
+            border:"none", borderLeft:`3px solid ${isActive ? MC.accent : "transparent"}`,
+            color: isActive ? MC.accent : MC.textDim, cursor:"pointer",
+            fontSize:13, fontFamily:MC.sans, textAlign:"left", transition:"all 0.15s ease",
+          }}
+          onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = MC.accent+"08"; e.currentTarget.style.color = MC.text; } }}
+          onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = MC.textDim; } }}
+          >
+            <span style={{ fontSize:16, width:22, textAlign:"center" }}>{item.icon}</span>
+            <span style={{ fontWeight: isActive ? 600 : 400 }}>{item.label}</span>
+          </button>
+        );
+      })}
+      <div style={{ marginTop:"auto", padding:16, borderTop:`1px solid ${MC.border}` }}>
+        <div style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono, lineHeight:1.6 }}>
+          <div>v3.2.107</div>
+          <div>テスト: 776件</div>
+          <div>エージェント: 28体</div>
+          <div>フック: 4個</div>
+        </div>
+      </div>
+    </nav>
+  );
+}
+window.SideNav = SideNav;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 4: Dashboard Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const DashboardPanel = ({ state, sessionElapsed }) => {
+  const phaseTL = window.PHASE_TIMELINE;
+  const totalMin = state.execution.max_duration_minutes;
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gridTemplateRows:"auto auto 1fr", gap:12, height:"100%" }}>
+      <KPICard label="CI 成功率" value={`${Math.round(state.kpi.ci_success_rate * 100)}%`} target="90%" color={MC.green} icon="⚡" />
+      <KPICard label="テスト通過率" value={`${Math.round(state.kpi.test_pass_rate * 100)}%`} target="100%" color={MC.green} icon="🧪" />
+      <KPICard label="STABLE 進捗" value={`${state.stable.consecutive_success}/${state.stable.target_n}`} target={`N=${state.stable.target_n}`} color={state.stable.consecutive_success >= state.stable.target_n ? MC.green : MC.amber} icon="🎯" />
+      <div style={{ gridColumn:"1 / 3" }}>
+        <Panel title="セッションタイムライン" icon="🔄">
+          <div style={{ display:"flex", gap:2, height:32, borderRadius:4, overflow:"hidden", marginBottom:10 }}>
+            {phaseTL.map((p, i) => {
+              const w = (p.duration / totalMin) * 100;
+              const isActive = p.status === "active";
+              const isDone = p.status === "completed";
+              return (
+                <div key={p.phase} style={{ width:`${w}%`, background: isDone ? p.color+"40" : isActive ? p.color : p.color+"20", display:"flex", alignItems:"center", justifyContent:"center", gap:4, fontSize:11, fontWeight: isActive ? 700 : 400, color: isDone || isActive ? "#fff" : MC.textMuted, borderLeft: i > 0 ? `1px solid ${MC.bg}` : "none" }}>
+                  <span>{p.icon}</span><span>{p.phase}</span>
+                  {isActive && <span style={{ fontSize:9, opacity:0.8 }}>({formatDuration(p.duration)})</span>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ position:"relative", height:6, background:MC.border, borderRadius:3 }}>
+            <div style={{ height:"100%", borderRadius:3, transition:"width 1s linear", width:`${Math.min((sessionElapsed/totalMin)*100,100)}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} />
+            <div style={{ position:"absolute", top:-3, left:`${Math.min((sessionElapsed/totalMin)*100,100)}%`, width:12, height:12, borderRadius:"50%", background:MC.accent, border:`2px solid ${MC.bg}`, transform:"translateX(-50%)", boxShadow:`0 0 8px ${MC.accent}` }} />
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", marginTop:8, fontSize:10, fontFamily:MC.mono, color:MC.textMuted }}>
+            <span>0:00</span><span>1:00</span><span>2:30</span><span>3:45</span><span>5:00</span>
+          </div>
+        </Panel>
+      </div>
+      <Panel title="トークン予算" icon="💰">
+        <div style={{ display:"flex", justifyContent:"center", marginBottom:8 }}>
+          <Gauge value={state.token.remaining} max={state.token.total_budget} size={90} strokeWidth={7} color={MC.accent} label="残りトークン" sublabel={`${state.token.used}% 使用済`} />
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+          {Object.entries(state.token.allocation).map(([k, v]) => (
+            <div key={k} style={{ display:"flex", alignItems:"center", gap:6, fontSize:10 }}>
+              <span style={{ width:70, color:MC.textDim, textTransform:"capitalize" }}>{k}</span>
+              <div style={{ flex:1, height:4, background:MC.border, borderRadius:2, overflow:"hidden" }}>
+                <div style={{ height:"100%", width:`${v}%`, background: k==="development" ? MC.green : MC.accent+"80", borderRadius:2 }} />
+              </div>
+              <span style={{ fontFamily:MC.mono, color:MC.textMuted, width:28, textAlign:"right" }}>{v}%</span>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      <div style={{ gridColumn:"1 / 3" }}>
+        <Panel title="Goal / 目標" icon="🎯">
+          <div style={{ fontSize:13, color:MC.text, lineHeight:1.6, marginBottom:12 }}>{state.goal.title}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr", gap:8 }}>
+            <MiniStat label="セキュリティ" value={state.kpi.security_critical} unit="件" ok={state.kpi.security_critical === 0} />
+            <MiniStat label="ブロッカー" value={state.kpi.blocker_count} unit="件" ok={state.kpi.blocker_count === 0} />
+            <MiniStat label="修復試行" value={state.debug.same_error_retry_count} unit="/2" ok={state.debug.same_error_retry_count < 2} />
+            <MiniStat label="エラー" value={0} unit="件" ok={true} />
+          </div>
+        </Panel>
+      </div>
+      <Panel title="システム状態" icon="🖥️">
+        <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
+          <SysRow label="フェーズモード" value={state.project.phase_mode} color={MC.green} />
+          <SysRow label="自動Issue生成" value={state.automation.auto_issue_generation ? "ON" : "OFF"} color={MC.green} />
+          <SysRow label="自己進化" value={state.automation.self_evolution ? "ON" : "OFF"} color={MC.green} />
+          <SysRow label="最終Compact" value={formatTime(state.compact.last_pre_compact_at)} color={MC.textDim} />
+          <SysRow label="最終検証" value={formatTime(state.stable.last_verified_at)} color={MC.textDim} />
+          <SysRow label="Flaky疑い" value={state.debug.flaky_suspected ? "あり" : "なし"} color={state.debug.flaky_suspected ? MC.amber : MC.green} />
+        </div>
+      </Panel>
+    </div>
+  );
+};
+const KPICard = ({ label, value, target, color, icon }) => (
+  <div style={{ background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, padding:14, display:"flex", flexDirection:"column", gap:6 }}>
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+      <span style={{ fontSize:11, color:MC.textDim }}>{label}</span>
+      <span style={{ fontSize:14 }}>{icon}</span>
+    </div>
+    <div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color, letterSpacing:"-0.02em" }}>{value}</div>
+    <div style={{ fontSize:10, color:MC.textMuted }}>目標: {target}</div>
+  </div>
+);
+const MiniStat = ({ label, value, unit, ok }) => (
+  <div style={{ background:MC.bgCard, borderRadius:6, padding:"8px 10px", textAlign:"center", border:`1px solid ${ok ? MC.border : MC.red+"40"}` }}>
+    <div style={{ fontSize:18, fontWeight:700, fontFamily:MC.mono, color: ok ? MC.green : MC.red }}>{value}<span style={{ fontSize:10, color:MC.textMuted }}>{unit}</span></div>
+    <div style={{ fontSize:9, color:MC.textMuted, marginTop:2 }}>{label}</div>
+  </div>
+);
+const SysRow = ({ label, value, color }) => (
+  <div style={{ display:"flex", justifyContent:"space-between" }}>
+    <span style={{ color:MC.textMuted }}>{label}</span>
+    <span style={{ fontFamily:MC.mono, color, fontWeight:500 }}>{value}</span>
+  </div>
+);
+window.DashboardPanel = DashboardPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 5: Agent Teams Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const AgentsPanel = ({ state }) => {
+  const [selectedAgent, setSelectedAgent] = React.useState(null);
+  const [teamPattern, setTeamPattern] = React.useState("A");
+  const agents = window.AGENTS_DATA;
+  const statusCounts = { working:0, idle:0, completed:0 };
+  agents.forEach(a => { statusCounts[a.status] = (statusCounts[a.status] || 0) + 1; });
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gridTemplateRows:"auto 1fr", gap:12, height:"100%" }}>
+      <div style={{ gridColumn:"1 / -1", display:"flex", gap:10 }}>
+        <AgentStatCard label="稼働中" value={statusCounts.working} icon="✽" color={MC.green} />
+        <AgentStatCard label="完了" value={statusCounts.completed} icon="✔" color={MC.accent} />
+        <AgentStatCard label="待機" value={statusCounts.idle} icon="✙" color={MC.textMuted} />
+        <AgentStatCard label="総Agent" value={28} icon="🤖" color={MC.purple} />
+        <div style={{ flex:1, background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:11, color:MC.textDim, whiteSpace:"nowrap" }}>Team パターン:</span>
+          {["A","B","C"].map(p => (
+            <button key={p} onClick={() => setTeamPattern(p)} style={{
+              padding:"4px 14px", borderRadius:4, border:`1px solid ${teamPattern===p ? MC.accent : MC.border}`,
+              background: teamPattern===p ? MC.accent+"20" : "transparent",
+              color: teamPattern===p ? MC.accent : MC.textMuted, fontSize:11, fontWeight:600, cursor:"pointer", fontFamily:MC.mono,
+            }}>{p}</button>
+          ))}
+          <span style={{ fontSize:10, color:MC.textMuted, marginLeft:"auto" }}>
+            {teamPattern==="A" ? "並列実装" : teamPattern==="B" ? "品質強化" : "調査・設計"}
+          </span>
+        </div>
+      </div>
+      <Panel title="エージェント一覧" icon="👥" noPad>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:1, background:MC.border }}>
+          {agents.map(agent => (
+            <AgentCard key={agent.id} agent={agent} selected={selectedAgent===agent.id}
+              onClick={() => setSelectedAgent(selectedAgent===agent.id ? null : agent.id)} />
+          ))}
+        </div>
+      </Panel>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="起動チェーン" icon="🔗"><AgentChain phase={state.execution.phase} /></Panel>
+        {selectedAgent
+          ? <AgentDetail agent={agents.find(a => a.id===selectedAgent)} />
+          : <Panel title="Agent View" icon="👁"><div style={{ fontSize:11, color:MC.textMuted, textAlign:"center", padding:20, lineHeight:1.8 }}>エージェントを選択すると<br />詳細が表示されます<div style={{ marginTop:12, fontFamily:MC.mono, fontSize:10 }}><code>claude agents</code></div></div></Panel>
+        }
+      </div>
+    </div>
+  );
+};
+const AgentStatCard = ({ label, value, icon, color }) => (
+  <div style={{ background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:10, minWidth:100 }}>
+    <span style={{ fontSize:18, opacity:0.8 }}>{icon}</span>
+    <div>
+      <div style={{ fontSize:20, fontWeight:800, fontFamily:MC.mono, color }}>{value}</div>
+      <div style={{ fontSize:9, color:MC.textMuted }}>{label}</div>
+    </div>
+  </div>
+);
+const AgentCard = ({ agent, selected, onClick }) => {
+  const [hovered, setHovered] = React.useState(false);
+  return (
+    <div onClick={onClick} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+      style={{ padding:"10px 12px", cursor:"pointer", background: selected ? MC.accent+"10" : hovered ? MC.bgCard : MC.bgPanel, borderLeft:`3px solid ${selected ? MC.accent : "transparent"}`, display:"flex", alignItems:"center", gap:10, transition:"all 0.15s" }}>
+      <span style={{ fontSize:18 }}>{agent.icon}</span>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <StatusDot status={agent.status} size={6} />
+          <span style={{ fontSize:12, fontWeight:600, color:MC.text }}>{agent.name}</span>
+        </div>
+        <div style={{ fontSize:9, color:MC.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{agent.lastAction}</div>
+      </div>
+      {agent.time && <span style={{ fontSize:9, color:MC.textMuted, flexShrink:0 }}>{agent.time}</span>}
+    </div>
+  );
+};
+const AgentDetail = ({ agent }) => (
+  <Panel title={`${agent.icon} ${agent.name}`}>
+    <div style={{ display:"flex", flexDirection:"column", gap:10, fontSize:11 }}>
+      <div style={{ display:"flex", justifyContent:"space-between" }}><span style={{ color:MC.textMuted }}>日本語名</span><span style={{ color:MC.text }}>{agent.nameJa}</span></div>
+      <div style={{ display:"flex", justifyContent:"space-between" }}><span style={{ color:MC.textMuted }}>ステータス</span><div style={{ display:"flex", alignItems:"center", gap:4 }}><StatusDot status={agent.status} size={6} /><span style={{ color:MC.text, textTransform:"capitalize" }}>{agent.status}</span></div></div>
+      <div style={{ display:"flex", justifyContent:"space-between" }}><span style={{ color:MC.textMuted }}>ドメイン</span><Tag color={MC.purple}>{agent.domain}</Tag></div>
+      <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8 }}><div style={{ color:MC.textMuted, marginBottom:4 }}>最終アクション</div><div style={{ color:MC.text, lineHeight:1.5 }}>{agent.lastAction}</div></div>
+    </div>
+  </Panel>
+);
+const AgentChain = ({ phase }) => {
+  const chains = { Monitor:["CTO","PM","Analyst","Architect","DevOps","CMDB"], Development:["Architect","Developer","Reviewer"], Verify:["QA","Reviewer","Security","DevOps","e2e","Audit"], Improvement:["EvolutionMgr","PM","Architect","Developer","QA"] };
+  const chain = chains[phase] || chains.Development;
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+      {chain.map((name, i) => (
+        <div key={i} style={{ display:"flex", alignItems:"center", gap:6, fontSize:10 }}>
+          <span style={{ color: i===0 ? MC.green : MC.accent, fontFamily:MC.mono }}>{i===0 ? "▶" : "→"}</span>
+          <span style={{ color: i<2 ? MC.text : MC.textDim }}>{name}</span>
+          {i<2 && <StatusDot status="working" size={5} />}
+        </div>
+      ))}
+    </div>
+  );
+};
+window.AgentsPanel = AgentsPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 6: CI/CD & GitHub Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const CICDPanel = () => {
+  const [tab, setTab] = React.useState("workflows");
+  const workflows = window.CI_WORKFLOWS;
+  const prs = window.RECENT_PRS;
+  const issues = window.OPEN_ISSUES;
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:12, height:"100%" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <div style={{ display:"flex", gap:2, background:MC.bgPanel, borderRadius:6, padding:3, border:`1px solid ${MC.border}` }}>
+          {[["workflows","Workflows"],["prs","Pull Requests"],["issues","Issues"]].map(([id,label]) => (
+            <button key={id} onClick={() => setTab(id)} style={{ flex:1, padding:"7px 12px", borderRadius:4, border:"none", fontSize:12, fontWeight:600, cursor:"pointer", transition:"all 0.15s", background: tab===id ? MC.accent+"20" : "transparent", color: tab===id ? MC.accent : MC.textMuted }}>{label}</button>
+          ))}
+        </div>
+        {tab === "workflows" && (
+          <Panel title="GitHub Actions" icon="⚡" noPad>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+              <thead><tr style={{ borderBottom:`1px solid ${MC.border}` }}>{["状態","ワークフロー","ブランチ","コミット","実行時間","実行日時"].map(h => (<th key={h} style={{ padding:"8px 10px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10 }}>{h}</th>))}</tr></thead>
+              <tbody>{workflows.map((w,i) => (<tr key={i} style={{ borderBottom:`1px solid ${MC.border}08` }}><td style={{ padding:"8px 10px" }}><CIBadge status={w.status} /></td><td style={{ padding:"8px 10px", color:MC.text, fontWeight:500 }}>{w.displayName}</td><td style={{ padding:"8px 10px" }}><Tag color={MC.purple}>{w.branch}</Tag></td><td style={{ padding:"8px 10px", fontFamily:MC.mono, color:MC.textDim, fontSize:10 }}>{w.commit}</td><td style={{ padding:"8px 10px", fontFamily:MC.mono, color:MC.textDim }}>{w.duration}</td><td style={{ padding:"8px 10px", color:MC.textMuted }}>{w.time}</td></tr>))}</tbody>
+            </table>
+          </Panel>
+        )}
+        {tab === "prs" && (
+          <Panel title="Pull Requests" icon="🔀" noPad>
+            <div style={{ display:"flex", flexDirection:"column" }}>
+              {prs.map(pr => (
+                <div key={pr.number} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:`1px solid ${MC.border}08` }}>
+                  <span style={{ fontSize:16, color: pr.status==="merged" ? MC.purple : MC.green }}>{pr.status==="merged" ? "⏣" : "◉"}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:12, color:MC.text, fontWeight:500 }}><span style={{ color:MC.textMuted, fontFamily:MC.mono }}>#{pr.number}</span> {pr.title}</div>
+                    <div style={{ fontSize:10, color:MC.textMuted, marginTop:3, display:"flex", gap:8 }}><Tag color={MC.purple}>{pr.branch}</Tag><span>{pr.time}</span></div>
+                  </div>
+                  <CIBadge status={pr.status==="merged" ? "passed" : pr.checks} />
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+        {tab === "issues" && (
+          <Panel title="Open Issues" icon="📋" noPad>
+            <div style={{ display:"flex", flexDirection:"column" }}>
+              {issues.map(issue => (
+                <div key={issue.number} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:`1px solid ${MC.border}08` }}>
+                  <span style={{ fontSize:14, color:MC.green }}>●</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:12, color:MC.text, fontWeight:500 }}><span style={{ color:MC.textMuted, fontFamily:MC.mono }}>#{issue.number}</span> {issue.title}</div>
+                    <div style={{ display:"flex", gap:6, marginTop:4 }}>
+                      {issue.labels.map(l => (<Tag key={l} color={l.startsWith("P1") ? MC.red : l.startsWith("P2") ? MC.amber : MC.textMuted}>{l}</Tag>))}
+                      <span style={{ fontSize:10, color:MC.textMuted }}>{issue.assignee} · {issue.time}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="CI サマリー" icon="📊">
+          <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+            <div style={{ display:"flex", justifyContent:"center" }}><Gauge value={96} max={100} size={100} strokeWidth={8} color={MC.green} label="CI 成功率" /></div>
+            {[["テスト件数","776",MC.green],["PSScriptAnalyzer","0 警告",MC.green],["gitleaks","0 漏洩",MC.green],["Unit","21 files",MC.textDim],["Integration","11 files",MC.textDim]].map(([l,v,c]) => (
+              <div key={l} style={{ display:"flex", justifyContent:"space-between", fontSize:11 }}><span style={{ color:MC.textMuted }}>{l}</span><span style={{ fontFamily:MC.mono, color:c, fontWeight:500 }}>{v}</span></div>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="STABLE 判定" icon="🎯">
+          <div style={{ display:"flex", flexDirection:"column", gap:6, fontSize:11 }}>
+            {[["install","SUCCESS"],["lint","SUCCESS"],["test","SUCCESS"],["build","SUCCESS"],["CI","SUCCESS"],["review","OK"],["security","OK"],["error","0件"]].map(([k,v]) => (
+              <div key={k} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <span style={{ color:MC.textMuted }}>{k}</span>
+                <div style={{ display:"flex", alignItems:"center", gap:4 }}><StatusDot status="completed" size={5} /><span style={{ fontFamily:MC.mono, color:MC.green, fontSize:10 }}>{v}</span></div>
+              </div>
+            ))}
+            <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, textAlign:"center" }}>
+              <span style={{ fontSize:13, fontWeight:700, fontFamily:MC.mono, color:MC.amber }}>STABLE {window.MOCK_STATE.stable.consecutive_success}/{window.MOCK_STATE.stable.target_n}</span>
+            </div>
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+};
+const CIBadge = ({ status }) => {
+  const map = { success:{color:MC.green,label:"成功"}, passed:{color:MC.green,label:"成功"}, passing:{color:MC.green,label:"通過中"}, failure:{color:MC.red,label:"失敗"}, failed:{color:MC.red,label:"失敗"}, skipped:{color:MC.textMuted,label:"スキップ"}, running:{color:MC.amber,label:"実行中"} };
+  const m = map[status] || {color:MC.textMuted, label:status};
+  return <Tag color={m.color}>{m.label}</Tag>;
+};
+window.CICDPanel = CICDPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 7: Cron Scheduler Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const CronPanel = () => {
+  const [schedules, setSchedules] = React.useState(window.CRON_SCHEDULES);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const days = ["日","月","火","水","木","金","土"];
+  const togglePause = (idx) => setSchedules(prev => prev.map((s,i) => i===idx ? {...s, status: s.status==="active" ? "paused" : "active"} : s));
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:12, height:"100%" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="Cronスケジュール一覧" icon="🕐" headerRight={
+          <button onClick={() => setShowAdd(!showAdd)} style={{ padding:"4px 12px", borderRadius:4, border:`1px solid ${MC.accent}`, background:MC.accent+"18", color:MC.accent, fontSize:11, fontWeight:600, cursor:"pointer" }}>＋ 新規登録</button>
+        } noPad>
+          <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+            <thead><tr style={{ borderBottom:`1px solid ${MC.border}` }}>{["状態","プロジェクト","ホスト","スケジュール","実行時間","前回結果","次回実行","操作"].map(h => (<th key={h} style={{ padding:"8px 10px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10 }}>{h}</th>))}</tr></thead>
+            <tbody>
+              {schedules.map((s,i) => (
+                <tr key={i} style={{ borderBottom:`1px solid ${MC.border}08` }}>
+                  <td style={{ padding:"8px 10px" }}><StatusDot status={s.status==="active" ? "working" : "paused"} size={8} /></td>
+                  <td style={{ padding:"8px 10px", color:MC.text, fontWeight:500, fontSize:11 }}>{s.project}</td>
+                  <td style={{ padding:"8px 10px" }}><Tag color={MC.cyan}>{s.host}</Tag></td>
+                  <td style={{ padding:"8px 10px", fontFamily:MC.mono, color:MC.accent, fontSize:10 }}>{s.schedule}</td>
+                  <td style={{ padding:"8px 10px", fontFamily:MC.mono, color:MC.textDim }}>{s.duration}分</td>
+                  <td style={{ padding:"8px 10px" }}><Tag color={s.result==="success" ? MC.green : s.result==="running" ? MC.amber : MC.red}>{s.result}</Tag></td>
+                  <td style={{ padding:"8px 10px", color:MC.textDim, fontSize:10 }}>{s.nextRun}</td>
+                  <td style={{ padding:"8px 10px" }}><button onClick={() => togglePause(i)} style={{ padding:"3px 8px", borderRadius:3, border:`1px solid ${MC.border}`, background:"transparent", color:MC.textDim, fontSize:10, cursor:"pointer" }}>{s.status==="active" ? "⏸ 停止" : "▶ 再開"}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+        <Panel title="週間スケジュール" icon="📅">
+          <div style={{ display:"grid", gridTemplateColumns:"60px repeat(7, 1fr)", gap:2 }}>
+            <div></div>
+            {days.map(d => (<div key={d} style={{ textAlign:"center", fontSize:10, fontWeight:600, color:MC.textDim, padding:"4px 0" }}>{d}</div>))}
+            {[6,9,12,14,18,22].map(hour => (
+              <React.Fragment key={hour}>
+                <div style={{ fontSize:10, fontFamily:MC.mono, color:MC.textMuted, textAlign:"right", paddingRight:8, paddingTop:2 }}>{String(hour).padStart(2,"0")}:00</div>
+                {[0,1,2,3,4,5,6].map(day => {
+                  const match = schedules.find(s => {
+                    const parts = s.schedule.split(" ");
+                    const cronHour = parseInt(parts[1]);
+                    const cronDays = parts[4];
+                    if (cronHour !== hour) return false;
+                    if (cronDays === "*") return true;
+                    return cronDays.split(",").some(d => { if (d.includes("-")) { const [a,b] = d.split("-").map(Number); return day>=a && day<=b; } return parseInt(d)===day; });
+                  });
+                  return (
+                    <div key={day} style={{ height:28, borderRadius:3, background: match ? (match.status==="active" ? MC.accent+"25" : MC.textMuted+"15") : MC.bgCard, border:`1px solid ${match ? MC.accent+"40" : MC.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, color: match ? MC.accent : "transparent", fontFamily:MC.mono }}>
+                      {match ? match.project.substring(0,8) : ""}
+                    </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </div>
+        </Panel>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="Cron設定" icon="⚙️">
+          <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
+            {[["デフォルト実行時間","300分 (5h)",false],["ランチャーパス","/home/kensan/.claudeos/cron-launcher.sh",true],["セッションDir","/home/kensan/.claudeos/sessions",true],["ログDir","/home/kensan/.claudeos/logs",true],["エントリPrefix","CLAUDEOS",false],["メール通知","無効",false]].map(([l,v,mono]) => (
+              <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+                <span style={{ color:MC.textMuted, flexShrink:0 }}>{l}</span>
+                <span style={{ fontFamily: mono ? MC.mono : MC.sans, color:MC.text, fontWeight:500, fontSize: mono ? 9 : 11, textAlign:"right", wordBreak:"break-all" }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        {showAdd && (
+          <Panel title="新規スケジュール登録" icon="➕">
+            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+              {[["プロジェクト","project-name"],["ホスト","linux-dev-01"],["cron式","0 9 * * 1-6"],["実行時間(分)","300"]].map(([l,p]) => (
+                <div key={l}><div style={{ fontSize:10, color:MC.textMuted, marginBottom:4 }}>{l}</div>
+                  <input placeholder={p} style={{ width:"100%", padding:"6px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background:MC.bgCard, color:MC.text, fontSize:11, fontFamily:MC.mono, outline:"none", boxSizing:"border-box" }}
+                    onFocus={e => e.target.style.borderColor = MC.accent} onBlur={e => e.target.style.borderColor = MC.border} />
+                </div>
+              ))}
+              <button style={{ padding:8, borderRadius:4, border:"none", background:MC.accent, color:MC.bg, fontSize:12, fontWeight:700, cursor:"pointer" }} onClick={() => setShowAdd(false)}>登録</button>
+            </div>
+          </Panel>
+        )}
+      </div>
+    </div>
+  );
+};
+window.CronPanel = CronPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 8: Boot Sequence Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const BootPanel = ({ state }) => {
+  const steps = window.BOOT_STEPS;
+  const [expandedStep, setExpandedStep] = React.useState(null);
+  const completedCount = steps.filter(s => s.status === "completed").length;
+  const runningCount = steps.filter(s => s.status === "running").length;
+  const BootBadge = ({ status }) => {
+    const map = { completed:{color:MC.green,label:"完了"}, running:{color:MC.amber,label:"実行中"}, pending:{color:MC.textMuted,label:"待機"} };
+    const m = map[status] || map.pending;
+    return <Tag color={m.color}>{m.label}</Tag>;
+  };
+  return (
+    <div style={{ display:"grid", gridTemplateColumns:"1fr 320px", gap:12, height:"100%" }}>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="Boot Sequence 進捗" icon="🏁">
+          <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:12 }}>
+            <div style={{ flex:1 }}>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}><span style={{ fontSize:11, color:MC.textDim }}>完了: {completedCount}/9 ステップ</span><span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>{Math.round((completedCount/9)*100)}%</span></div>
+              <div style={{ height:8, background:MC.border, borderRadius:4, overflow:"hidden" }}><div style={{ height:"100%", borderRadius:4, transition:"width 0.5s", width:`${(completedCount/9)*100}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} /></div>
+            </div>
+            <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.green }}>{completedCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>完了</div></div>
+            <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.amber }}>{runningCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>実行中</div></div>
+          </div>
+        </Panel>
+        <Panel title="9ステップ初期化" icon="🚀" noPad style={{ flex:1 }}>
+          <div style={{ display:"flex", flexDirection:"column" }}>
+            {steps.map((step) => (
+              <div key={step.step} onClick={() => setExpandedStep(expandedStep===step.step ? null : step.step)} style={{ padding:"12px 16px", borderBottom:`1px solid ${MC.border}08`, cursor:"pointer", transition:"background 0.15s", background: expandedStep===step.step ? MC.accent+"08" : "transparent" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  <div style={{ width:32, height:32, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, fontFamily:MC.mono, flexShrink:0, background: step.status==="completed" ? MC.green+"20" : step.status==="running" ? MC.amber+"20" : MC.border, color: step.status==="completed" ? MC.green : step.status==="running" ? MC.amber : MC.textMuted, border:`2px solid ${step.status==="completed" ? MC.green+"60" : step.status==="running" ? MC.amber+"60" : MC.border}` }}>{step.status==="completed" ? "✓" : step.step}</div>
+                  <div style={{ flex:1 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}><span style={{ fontSize:12, fontWeight:600, color:MC.text }}>{step.name}</span><span style={{ fontSize:10, color:MC.textMuted }}>({step.nameEn})</span></div>
+                    <div style={{ fontSize:10, color:MC.textMuted, marginTop:2 }}>{step.detail}</div>
+                  </div>
+                  <div style={{ textAlign:"right", flexShrink:0 }}><BootBadge status={step.status} />{step.duration!=="—" && <div style={{ fontSize:9, fontFamily:MC.mono, color:MC.textMuted, marginTop:2 }}>{step.duration}</div>}</div>
+                </div>
+                {expandedStep===step.step && (
+                  <div style={{ marginTop:10, marginLeft:44, padding:"10px 12px", background:MC.bgCard, borderRadius:6, border:`1px solid ${MC.border}`, fontSize:11, color:MC.textDim, lineHeight:1.6 }}>
+                    <div><strong style={{ color:MC.text }}>Step {step.step}:</strong> {step.name} ({step.nameEn})</div>
+                    <div style={{ marginTop:4 }}>状態: <span style={{ color: step.status==="completed" ? MC.green : MC.amber }}>{step.status}</span></div>
+                    <div>所要時間: {step.duration}</div><div>詳細: {step.detail}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Panel>
+      </div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <Panel title="Boot コマンド" icon="⌨️">
+          <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+            {[["Start-ClaudeOS.ps1","9ステップ初期化"],["Start-ClaudeOS.ps1 -DryRun","非破壊プレビュー"],["Start-ClaudeOS.ps1 -NonInteractive","CI / 自動実行向け"]].map(c => (
+              <div key={c[0]} style={{ padding:"8px 10px", borderRadius:6, background:MC.bgCard, border:`1px solid ${MC.border}` }}>
+                <code style={{ fontSize:10, fontFamily:MC.mono, color:MC.accent }}>{c[0]}</code>
+                <div style={{ fontSize:9, color:MC.textMuted, marginTop:2 }}>{c[1]}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="Hooks (4個)" icon="🪝">
+          <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+            {[["session-start","SessionStart","state.json読込・KPI表示"],["pre-compact","PreCompact","compactタイムスタンプ記録"],["session-end","Stop","停止時刻・learning記録"],["usage-tracker","PostToolUse","Agent使用実績を記録"]].map(h => (
+              <div key={h[0]} style={{ padding:"8px 10px", borderRadius:6, background:MC.bgCard, border:`1px solid ${MC.border}`, fontSize:11 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:2 }}><span style={{ fontFamily:MC.mono, color:MC.text, fontWeight:500 }}>{h[0]}</span><Tag color={MC.purple}>{h[1]}</Tag></div>
+                <div style={{ fontSize:9, color:MC.textMuted }}>{h[2]}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+        <Panel title="モジュール構成" icon="📦">
+          <div style={{ display:"flex", flexDirection:"column", gap:3, fontSize:10 }}>
+            {["Config.psm1","LauncherCommon.psm1","MenuCommon.psm1","SSHHelper.psm1","ErrorHandler.psm1","McpHealthCheck.psm1","AgentTeams.psm1","WorktreeManager.psm1","IssueSyncManager.psm1","TokenBudget.psm1","ArchitectureCheck.psm1","SelfEvolution.psm1"].map(m => (<div key={m} style={{ fontFamily:MC.mono, color:MC.textDim, padding:"3px 0", borderBottom:`1px solid ${MC.border}08` }}>{m}</div>))}
+          </div>
+        </Panel>
+      </div>
+    </div>
+  );
+};
+window.BootPanel = BootPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 9: Event Log Panel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const LogPanel = () => {
+  const logs = window.EVENT_LOG;
+  const [filter, setFilter] = React.useState("all");
+  const [autoScroll, setAutoScroll] = React.useState(true);
+  const logRef = React.useRef(null);
+  const filtered = filter==="all" ? logs : logs.filter(l => l.type===filter);
+  React.useEffect(() => {
+    if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [filtered.length, autoScroll]);
+  const typeColors = { info:MC.textDim, success:MC.green, decision:MC.amber, phase:MC.accent, error:MC.red };
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
+      <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+        {[["all","すべて"],["info","情報"],["success","成功"],["decision","判断"],["phase","フェーズ"],["error","エラー"]].map(([id,label]) => (
+          <button key={id} onClick={() => setFilter(id)} style={{ padding:"5px 12px", borderRadius:4, border:`1px solid ${filter===id ? MC.accent : MC.border}`, background: filter===id ? MC.accent+"18" : "transparent", color: filter===id ? MC.accent : MC.textMuted, fontSize:11, cursor:"pointer", fontWeight:500 }}>{label}</button>
+        ))}
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6 }}>
+          <button onClick={() => setAutoScroll(!autoScroll)} style={{ padding:"5px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background: autoScroll ? MC.green+"18" : "transparent", color: autoScroll ? MC.green : MC.textMuted, fontSize:10, cursor:"pointer" }}>{autoScroll ? "⬇ 自動スクロール ON" : "⬇ 自動スクロール OFF"}</button>
+          <span style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>{filtered.length}件</span>
+        </div>
+      </div>
+      <Panel title="イベントログ" icon="📜" noPad style={{ flex:1 }}>
+        <div ref={logRef} style={{ height:"100%", overflow:"auto", fontFamily:MC.mono, fontSize:11 }}>
+          <table style={{ width:"100%", borderCollapse:"collapse" }}>
+            <thead><tr style={{ position:"sticky", top:0, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, zIndex:1 }}>
+              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:80 }}>時刻</th>
+              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:160 }}>エージェント</th>
+              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10 }}>メッセージ</th>
+              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:60 }}>種別</th>
+            </tr></thead>
+            <tbody>
+              {filtered.map((log,i) => (
+                <tr key={i} style={{ borderBottom:`1px solid ${MC.border}06`, background: i%2===0 ? "transparent" : MC.bgCard+"40" }}>
+                  <td style={{ padding:"6px 12px", color:MC.textMuted, fontSize:10, whiteSpace:"nowrap" }}>{log.time}</td>
+                  <td style={{ padding:"6px 12px", color:MC.text, fontSize:11 }}>{log.agent}</td>
+                  <td style={{ padding:"6px 12px", color:typeColors[log.type]||MC.textDim, lineHeight:1.4 }}>{log.message}</td>
+                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{log.type}</Tag></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+    </div>
+  );
+};
+window.LogPanel = LogPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 10: App Root
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const TWEAK_DEFAULTS = { accentColor: "#00d4ff", darkMode: true, showScanlines: false, clockFormat: "24h", animationsEnabled: true };
+
+const App = () => {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [activePanel, setActivePanel] = React.useState("dashboard");
+  const [sessionElapsed, setSessionElapsed] = React.useState(window.MOCK_STATE.execution.elapsed_minutes);
+  const [, forceRender] = React.useState(0);
+
+  React.useEffect(() => {
+    applyTheme(t.darkMode);
+    forceRender(n => n + 1);
+  }, [t.darkMode]);
+
+  React.useEffect(() => {
+    MC.accent = t.accentColor;
+    forceRender(n => n + 1);
+  }, [t.accentColor]);
+
+  const renderPanel = () => {
+    const state = window.MOCK_STATE;
+    switch (activePanel) {
+      case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} />;
+      case "agents":    return <AgentsPanel state={state} />;
+      case "cicd":      return <CICDPanel />;
+      case "cron":      return <CronPanel />;
+      case "boot":      return <BootPanel state={state} />;
+      case "log":       return <LogPanel />;
+      default:          return <DashboardPanel state={state} sessionElapsed={sessionElapsed} />;
+    }
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100vh", background:MC.bg, position:"relative" }}>
+      {t.showScanlines && (
+        <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, pointerEvents:"none", zIndex:1000, background:"repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)" }} />
+      )}
+      <TopBar state={window.MOCK_STATE} sessionElapsed={sessionElapsed} setSessionElapsed={setSessionElapsed}
+        darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)} />
+      <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
+        <SideNav active={activePanel} onChange={setActivePanel} />
+        <main style={{ flex:1, padding:16, overflow:"auto", animation: t.animationsEnabled ? "mcFadeIn 0.3s ease" : "none" }} key={activePanel}>
+          {renderPanel()}
+        </main>
+      </div>
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="テーマ">
+          <TweakToggle label="ダークモード" value={t.darkMode} onChange={v => setTweak("darkMode", v)} />
+          <TweakColor label="アクセントカラー" value={t.accentColor}
+            options={["#00d4ff","#a78bfa","#00ff88","#fbbf24","#ff6b6b"]}
+            onChange={v => setTweak("accentColor", v)} />
+          <TweakToggle label="スキャンライン効果" value={t.showScanlines} onChange={v => setTweak("showScanlines", v)} />
+          <TweakToggle label="アニメーション" value={t.animationsEnabled} onChange={v => setTweak("animationsEnabled", v)} />
+        </TweakSection>
+        <TweakSection label="表示">
+          <TweakSelect label="時計形式" value={t.clockFormat} options={["24h","12h"]} onChange={v => setTweak("clockFormat", v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>

@@ -520,6 +520,58 @@ function handleApiData(res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Mission Control aggregated data endpoint
+// ---------------------------------------------------------------------------
+function handleMcData(res) {
+  try {
+    const cronReg = fs.existsSync(CRON_REG)
+      ? JSON.parse(fs.readFileSync(CRON_REG, 'utf8'))
+      : [];
+    const cronSchedules = (Array.isArray(cronReg) ? cronReg : []).map(e => {
+      const n = normalizeEntry(e);
+      const DOW_JP = ['日','月','火','水','木','金','土'];
+      const days = Array.isArray(n.dayOfWeek) ? n.dayOfWeek.map(d => DOW_JP[d] || d).join('-') : '*';
+      return {
+        project:  n.project,
+        host:     n.linuxHost || LINUX_HOST,
+        schedule: n.time ? `0 ${n.time.split(':')[0]} * * ${n.dayOfWeek ? n.dayOfWeek.join(',') : '1-6'}` : '0 9 * * 1-6',
+        duration: n.duration || 300,
+        status:   'active',
+        lastRun:  n.created ? n.created.split('T')[0] : '—',
+        nextRun:  '—',
+        result:   'success',
+      };
+    });
+
+    const data = { cronSchedules, generated: new Date().toISOString() };
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(JSON.stringify(data, null, 2));
+  } catch (e) {
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: e.message }));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Mission Control HTML (static file)
+// ---------------------------------------------------------------------------
+const MC_HTML_PATH = path.join(__dirname, 'mission-control.html');
+
+function handleMissionControl(res) {
+  try {
+    if (fs.existsSync(MC_HTML_PATH)) {
+      const html = fs.readFileSync(MC_HTML_PATH, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    } else {
+      res.writeHead(404); res.end('mission-control.html not found');
+    }
+  } catch (e) {
+    res.writeHead(500); res.end(e.message);
+  }
+}
+
 // Export for testing (must be before server start guard)
 if (typeof module !== 'undefined') {
   module.exports = { getAllProjects, getRegisteredProjects, buildProjectData, buildTimeline, weeksToPhase };
@@ -533,7 +585,9 @@ if (require.main === module) {
     if (!host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
       res.writeHead(403); res.end('Forbidden'); return;
     }
-    if (req.url === '/api/data') return handleApiData(res);
+    if (req.url === '/api/data')           return handleApiData(res);
+    if (req.url === '/api/mc-data')        return handleMcData(res);
+    if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());
   });
