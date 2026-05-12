@@ -10,6 +10,9 @@
 > **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
 > Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
+> **🔄 v3.3.0 — テスト検証・デバッグ統合指示書 + Mission Control WebUI + START_PROMPT 強化**
+> `11-test-debug-integration.md` を新規追加（5カテゴリ：フロントエンド・バックエンド・セキュリティ・インフラ・DB の検証・デバッグ方法論 + Playwright E2E 必須 + Codex/CodeRabbit 統合フロー）。品質ゲート条件: Codex エラー=0 / CodeRabbit Critical/High=0 / テスト成功率100% / STABLE N=3。`_footer.md` に `/goal` 10ループテンプレートを追加。NASA風 Mission Control WebUI を `scripts/dashboards/mission-control.html` に実装（Projects/AgentTeams/CI/Cron/Boot/EventLog 6パネル）。
+
 > **🧪 v3.2.107 — WebUI 全テスト検証 250 項目を全プロジェクト実行の最終プロンプトに追加**
 > フロントエンド 110 項目 ＋ バックエンド 140 項目（AI 開発系検証含む）の 250 項目チェックリストを `10-webui-final-verification.md` として追加し、全プロジェクトの START_PROMPT.md 末尾に自動組み込み。詳細は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
 

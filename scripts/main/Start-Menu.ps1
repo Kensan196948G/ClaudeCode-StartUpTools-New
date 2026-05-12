@@ -272,7 +272,11 @@ function Show-Menu {
         "10  🌿 Worktree Manager",
         "11  🏛️  Architecture Check",
         "12  📊 Statusline 設定",
-        "13  📡 Claude ログ監視タブを開く"
+        "13  📡 Claude ログ監視タブを開く",
+        "D   🌐 Projects Dashboard (進捗 WebUI)",
+        "MC  🎛️  Mission Control (統合管理コンソール)",
+        "DR  📌 Dashboard をタスクスケジューラーに登録（自動起動）",
+        "DU  🗑️  Dashboard タスクを解除"
     ) | ForEach-Object { Write-Host "    $_" -ForegroundColor Magenta }
     Write-Host ""
 
@@ -378,7 +382,22 @@ while ($true) {
                 ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
                 ($Config.windowsTerminal.PSObject.Properties.Name -contains 'backgroundImage') -and $Config.windowsTerminal.backgroundImage
             ) { [string]$Config.windowsTerminal.backgroundImage } else { '' }
-            $setupArgs = if (-not [string]::IsNullOrWhiteSpace($wtBgImage)) { @('-BackgroundImage', $wtBgImage) } else { @() }
+            $wtBgOpacity = if (
+                ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+                ($Config.windowsTerminal.PSObject.Properties.Name -contains 'backgroundImageOpacity') -and $null -ne $Config.windowsTerminal.backgroundImageOpacity
+            ) { [double]$Config.windowsTerminal.backgroundImageOpacity } else { 0.28 }
+            $wtTheme = if (
+                ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+                ($Config.windowsTerminal.PSObject.Properties.Name -contains 'theme') -and $Config.windowsTerminal.theme
+            ) { [string]$Config.windowsTerminal.theme } else { 'One Half Dark' }
+            $wtProfileName = if (
+                ($Config.PSObject.Properties.Name -contains 'windowsTerminal') -and $Config.windowsTerminal -and
+                ($Config.windowsTerminal.PSObject.Properties.Name -contains 'profileName') -and $Config.windowsTerminal.profileName
+            ) { [string]$Config.windowsTerminal.profileName } else { 'AI CLI Startup' }
+            $setupArgs = @('-Theme', $wtTheme, '-ProfileName', $wtProfileName)
+            if (-not [string]::IsNullOrWhiteSpace($wtBgImage)) {
+                $setupArgs += @('-BackgroundImage', $wtBgImage, '-BackgroundImageOpacity', $wtBgOpacity)
+            }
             Invoke-MenuScript -File "scripts\setup\setup-windows-terminal.ps1" -ScriptArgs $setupArgs
         }
         "8"  { Invoke-MenuScript -File "scripts\test\Test-McpHealth.ps1" }
@@ -393,6 +412,17 @@ while ($true) {
             Read-Host "  Enterキーでメニューに戻ります"
         }
         "14" { Invoke-MenuScript -File "scripts\main\New-CronSchedule.ps1" }
+        "D"  { Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" }
+        "MC" {
+            $env:AI_STARTUP_PROJECTS_DIR = $Config.projectsDir
+            Start-Process "http://localhost:3737/mission-control"
+            Write-Host "[MC] Mission Control: http://localhost:3737/mission-control" -ForegroundColor Cyan
+            if (-not (Get-NetTCPConnection -LocalPort 3737 -ErrorAction SilentlyContinue)) {
+                Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" -ScriptArgs @('-NoBrowser')
+            }
+        }
+        "DR" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-RunNow') }
+        "DU" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-Unregister') }
         "15" {
             $watchScript = Join-Path $ProjectRoot "scripts\tools\Watch-SessionInfoSSH.ps1"
             & $ShellExe -NoProfile -ExecutionPolicy Bypass -File $watchScript

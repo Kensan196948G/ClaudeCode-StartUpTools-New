@@ -44,7 +44,10 @@ function New-SessionInfo {
         [ValidateSet('manual', 'cron')]
         [string]$Trigger = 'manual',
         [int]$ProcessId = 0,
-        [string]$ConfigSessionsDir = ''
+        [string]$ConfigSessionsDir = '',
+        [string]$ProjectRegistrationDate = '',
+        [string]$ProjectReleaseDeadline  = '',
+        [int]$ProjectDurationMonths      = 6
     )
 
     $sessionId = New-SessionId -Project $Project
@@ -52,15 +55,18 @@ function New-SessionInfo {
     $end = $start.AddMinutes($DurationMinutes)
 
     $session = [pscustomobject]@{
-        sessionId            = $sessionId
-        project              = $Project
-        trigger              = $Trigger
-        start_time           = $start.ToString('o')
-        max_duration_minutes = $DurationMinutes
-        end_time_planned     = $end.ToString('o')
-        status               = 'running'
-        pid                  = $ProcessId
-        last_updated         = $start.ToString('o')
+        sessionId                  = $sessionId
+        project                    = $Project
+        trigger                    = $Trigger
+        start_time                 = $start.ToString('o')
+        max_duration_minutes       = $DurationMinutes
+        end_time_planned           = $end.ToString('o')
+        status                     = 'running'
+        pid                        = $ProcessId
+        last_updated               = $start.ToString('o')
+        project_registration_date  = $ProjectRegistrationDate
+        project_release_deadline   = $ProjectReleaseDeadline
+        project_duration_months    = $ProjectDurationMonths
     }
 
     $dir = Get-SessionDir -ConfigSessionsDir $ConfigSessionsDir
