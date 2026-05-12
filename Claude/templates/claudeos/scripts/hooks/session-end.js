@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-// Stop hook (ClaudeOS v8.2)
+// Stop hook (ClaudeOS v9.0)
 // セッション終了時に state.json を最終更新し、続けて notify-stable を同期実行する。
+// v9.0: learning パターン記録（成功/失敗パターンを state.learning へ追記）を追加。
 // 並列実行による state.json への race condition を避けるため、両者は単一 hook エントリに統合する。
 // 失敗しても Stop hook をブロックしない fail-soft 設計。
 //
-// 実行順序: state.json 更新 → Webhook → notify-stable → Dreaming spawn
-// Dreaming spawn は notify-stable の state.json 書き込みが完了してから行う。
-// これにより dreaming runner が読む state.json に notify-stable の変更が反映される。
+// 実行順序: state.json 更新 → learning 記録 → Webhook → notify-stable → Dreaming spawn
 
 const fs = require("fs");
 const path = require("path");
@@ -88,16 +87,14 @@ try {
         console.log(`[SessionEnd][WARN] Quality gates breached: ${breaches.map(b => b.gate).join(", ")}`);
       }
     } catch (qgErr) {
-      // hook 自体は壊さない。レポート未生成等は無視。
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] quality-gate skipped: ${qgErr.message}`);
     }
 
     // Deploy runbook auto-gen: state.deploy.ready=true なら手順書を生成する。
-    // 実デプロイは人間手動。CTO は手順書生成までを担当。
     try {
       if (state.deploy && state.deploy.ready) {
         const { spawnSync } = require("child_process");
-        const script = path.resolve(__dirname, "..", "..", "..", "..", "scripts", "release", "generate-deploy-runbook.js");
+        const script = path.join(process.cwd(), "scripts", "release", "generate-deploy-runbook.js");
         if (fs.existsSync(script)) {
           const r = spawnSync(process.execPath, [script], { cwd: process.cwd(), encoding: "utf8" });
           if (r.status === 0) console.log("[SessionEnd] deploy runbook generated (reports/deploy-runbook.md)");
@@ -126,8 +123,40 @@ try {
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] tdd-scan skipped: ${tddErr.message}`);
     }
 
+    // v9.0: learning パターン記録（成功 / 失敗を state.learning へ追記）
+    try {
+      const stableAchieved = !!(state.stable || {}).stable_achieved;
+      const summary = (state.execution || {}).last_session_summary || "";
+      const blockedCount = (state.blocked_issues || []).length;
+      const warnings = state.warnings || [];
+
+      state.learning = state.learning || { failure_patterns: [], success_patterns: [] };
+      state.learning.failure_patterns = state.learning.failure_patterns || [];
+      state.learning.success_patterns = state.learning.success_patterns || [];
+
+      if (stableAchieved && summary) {
+        // 成功パターン: 直近 20 件を上限として記録
+        const entry = { at: new Date().toISOString(), summary: summary.slice(0, 200) };
+        state.learning.success_patterns.unshift(entry);
+        if (state.learning.success_patterns.length > 20) state.learning.success_patterns.length = 20;
+        console.log("[SessionEnd][Learning] success_pattern recorded");
+      } else if (blockedCount > 0 || warnings.some(w => w.kind === "verify_subagent_missing")) {
+        // 失敗パターン: blocked_issues / verify warning を記録
+        const reasons = [
+          ...((state.blocked_issues || []).map(b => typeof b === "object" ? b.reason || b.issue || String(b) : String(b))),
+          ...warnings.filter(w => w.kind === "verify_subagent_missing").map(w => w.kind),
+        ].slice(0, 5);
+        const entry = { at: new Date().toISOString(), reasons, summary: summary.slice(0, 200) };
+        state.learning.failure_patterns.unshift(entry);
+        if (state.learning.failure_patterns.length > 20) state.learning.failure_patterns.length = 20;
+        console.log(`[SessionEnd][Learning] failure_pattern recorded (reasons: ${reasons.join(", ")})`);
+      }
+    } catch (learnErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] learning-record skipped: ${learnErr.message}`);
+    }
+
     writeJsonAtomic(STATE_FILE, state);
-    console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
+    console.log("[SessionEnd] state.json updated (last_stop_at + learning recorded)");
 
     // Webhook: session_end イベントを外部へ通知（detached spawn）
     try {
@@ -164,6 +193,7 @@ try {
     const bank        = rb.loadBank(dataDir);
     const entry       = rb.buildEntry(stateRB, projectName);
     if (entry) {
+      // Stage 2: 既存エントリに SONA 重み更新（時間減衰 + アウトカムデルタ）を適用してから新規追加
       rb.updateSONAWeights(bank, entry.project, entry.tags, entry.stable_achieved);
       rb.upsertEntry(bank, entry);
       rb.pruneBank(bank);
@@ -171,6 +201,7 @@ try {
       const sonaUpdated = bank.entries.filter(e => e.id !== entry.id).length;
       console.log(`[ReasoningBank] Saved: ${entry.id} conf=${entry.confidence.toFixed(2)} tags=[${entry.tags.join(",")}] | SONA updated ${sonaUpdated} existing entries`);
     } else {
+      // 低信頼でも既存エントリの時間減衰だけは実行する
       const stateRBStab = (stateRB.stable || {});
       const stateRBExec = (stateRB.execution || {});
       const fallbackTags = rb.extractTags(stateRBExec.last_session_summary || "");
