@@ -523,23 +523,73 @@ function handleApiData(res) {
 // ---------------------------------------------------------------------------
 // Mission Control aggregated data endpoint
 // ---------------------------------------------------------------------------
+
+// Compute next run date from cron expression (server-side)
+function computeCronNextRun(scheduleExpr) {
+  const parts = String(scheduleExpr || '').trim().split(/\s+/);
+  if (parts.length < 5) return null;
+  const min  = parseInt(parts[0]);
+  const hour = parseInt(parts[1]);
+  const dowStr = parts[4];
+
+  // Parse DOW
+  const dows = new Set();
+  String(dowStr).split(',').forEach(p => {
+    if (p.includes('-')) {
+      const [a, b] = p.split('-').map(Number);
+      for (let i = a; i <= b; i++) dows.add(i);
+    } else {
+      const n = parseInt(p);
+      if (!isNaN(n)) dows.add(n);
+    }
+  });
+  if (dows.size === 0) return null;
+
+  const now = new Date();
+  for (let i = 0; i <= 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    d.setHours(hour, min, 0, 0);
+    if (i === 0 && d <= now) continue;
+    if (dows.has(d.getDay())) return d;
+  }
+  return null;
+}
+
 function handleMcData(res) {
   try {
     const cronReg = fs.existsSync(CRON_REG)
       ? JSON.parse(fs.readFileSync(CRON_REG, 'utf8'))
       : [];
+
     const cronSchedules = (Array.isArray(cronReg) ? cronReg : []).map(e => {
       const n = normalizeEntry(e);
-      const DOW_JP = ['日','月','火','水','木','金','土'];
-      const days = Array.isArray(n.dayOfWeek) ? n.dayOfWeek.map(d => DOW_JP[d] || d).join('-') : '*';
+      // Build cron expression from time + dayOfWeek
+      let scheduleExpr = '0 9 * * 1-6';
+      if (n.time) {
+        const [hh, mm] = n.time.split(':');
+        const min  = parseInt(mm || '0') || 0;
+        const hour = parseInt(hh) || 9;
+        const dowPart = Array.isArray(n.dayOfWeek) && n.dayOfWeek.length
+          ? n.dayOfWeek.join(',')
+          : '1-6';
+        scheduleExpr = `${min} ${hour} * * ${dowPart}`;
+      }
+
+      // Compute next run
+      const nextDate = computeCronNextRun(scheduleExpr);
+      const nextRun = nextDate
+        ? `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')} ${String(nextDate.getHours()).padStart(2,'0')}:${String(nextDate.getMinutes()).padStart(2,'0')}`
+        : '—';
+
       return {
         project:  n.project,
         host:     n.linuxHost || LINUX_HOST,
-        schedule: n.time ? `0 ${n.time.split(':')[0]} * * ${n.dayOfWeek ? n.dayOfWeek.join(',') : '1-6'}` : '0 9 * * 1-6',
+        schedule: scheduleExpr,
         duration: n.duration || 300,
         status:   'active',
         lastRun:  n.created ? n.created.split('T')[0] : '—',
-        nextRun:  '—',
+        nextRun,
         result:   'success',
       };
     });
