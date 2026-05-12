@@ -473,7 +473,7 @@ Critical/High 0 件 → マージ
 
 ### 品質ゲート（マージ可能条件）
 
-```
+```text
 Codex エラー: 0 件
 CodeRabbit Critical/High: 0 件
 テスト成功率: 100%
