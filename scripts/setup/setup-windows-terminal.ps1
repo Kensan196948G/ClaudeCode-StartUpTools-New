@@ -14,6 +14,8 @@ param(
     [int]$Opacity = 95,
     [string]$FontFace = 'Cascadia Code',
     [string]$BackgroundImage = '',
+    [ValidateRange(0.0, 1.0)]
+    [double]$BackgroundImageOpacity = 0.28,
     [bool]$UseAcrylic = $true,
     [string]$ThemeJsonPath = '',
     [string]$ProfileOverridesJsonPath = ''
@@ -102,6 +104,7 @@ function New-TerminalProfileObject {
         [string]$ProfileStartingDirectory = $StartingDirectory,
         [string]$ProfileIcon = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe',
         [string]$ProfileBackgroundImage = $BackgroundImage,
+        [double]$ProfileBackgroundImageOpacity = $BackgroundImageOpacity,
         [string]$ProfileFontFace = $FontFace,
         [int]$ProfileFontSize = $FontSize,
         [int]$ProfileOpacity = $Opacity,
@@ -134,7 +137,7 @@ function New-TerminalProfileObject {
 
     if (-not [string]::IsNullOrWhiteSpace($ProfileBackgroundImage)) {
         $terminalProfile | Add-Member -NotePropertyName backgroundImage -NotePropertyValue $ProfileBackgroundImage -Force
-        $terminalProfile | Add-Member -NotePropertyName backgroundImageOpacity -NotePropertyValue 0.15 -Force
+        $terminalProfile | Add-Member -NotePropertyName backgroundImageOpacity -NotePropertyValue $ProfileBackgroundImageOpacity -Force
         $terminalProfile | Add-Member -NotePropertyName backgroundImageStretchMode -NotePropertyValue 'uniformToFill' -Force
     }
 
@@ -150,6 +153,7 @@ function Set-TerminalProfile {
         [string]$ProfileStartingDirectory = $StartingDirectory,
         [string]$ProfileIcon = '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe',
         [string]$ProfileBackgroundImage = $BackgroundImage,
+        [double]$ProfileBackgroundImageOpacity = $BackgroundImageOpacity,
         [string]$ProfileFontFace = $FontFace,
         [int]$ProfileFontSize = $FontSize,
         [int]$ProfileOpacity = $Opacity,
@@ -159,7 +163,7 @@ function Set-TerminalProfile {
     $existing = @($Settings.profiles.list | Where-Object { $_.name -eq $Name } | Select-Object -First 1)
     $current = if ($existing.Count -gt 0) { $existing[0] } else { $null }
     $guid = if ($null -ne $current -and $current.guid) { "$($current.guid)" } else { "{0}" -f ('{' + [guid]::NewGuid().ToString() + '}') }
-    $terminalProfile = New-TerminalProfileObject -Name $Name -Guid $guid -SchemeName $SchemeName -ProfileStartingDirectory $ProfileStartingDirectory -ProfileIcon $ProfileIcon -ProfileBackgroundImage $ProfileBackgroundImage -ProfileFontFace $ProfileFontFace -ProfileFontSize $ProfileFontSize -ProfileOpacity $ProfileOpacity -ProfileColorScheme $ProfileColorScheme
+    $terminalProfile = New-TerminalProfileObject -Name $Name -Guid $guid -SchemeName $SchemeName -ProfileStartingDirectory $ProfileStartingDirectory -ProfileIcon $ProfileIcon -ProfileBackgroundImage $ProfileBackgroundImage -ProfileBackgroundImageOpacity $ProfileBackgroundImageOpacity -ProfileFontFace $ProfileFontFace -ProfileFontSize $ProfileFontSize -ProfileOpacity $ProfileOpacity -ProfileColorScheme $ProfileColorScheme
 
     if ($null -ne $current) {
         $index = [array]::IndexOf($Settings.profiles.list, $current)
@@ -252,20 +256,22 @@ $mainTheme = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Prope
 $mainDir = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'startingDirectory') -and $mainOverride[0].startingDirectory) { "$($mainOverride[0].startingDirectory)" } else { $StartingDirectory }
 $mainIcon = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'icon') -and $mainOverride[0].icon) { "$($mainOverride[0].icon)" } else { '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe' }
 $mainBackgroundImage = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'backgroundImage') -and $mainOverride[0].backgroundImage) { "$($mainOverride[0].backgroundImage)" } else { $BackgroundImage }
+$mainBackgroundImageOpacity = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'backgroundImageOpacity') -and $null -ne $mainOverride[0].backgroundImageOpacity) { [double]$mainOverride[0].backgroundImageOpacity } else { $BackgroundImageOpacity }
 $mainFontFace = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'fontFace') -and $mainOverride[0].fontFace) { "$($mainOverride[0].fontFace)" } else { $FontFace }
 $mainFontSize = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'fontSize') -and $mainOverride[0].fontSize) { [int]$mainOverride[0].fontSize } else { $FontSize }
 $mainOpacity = if ($mainOverride.Count -gt 0 -and ($mainOverride[0].PSObject.Properties.Name -contains 'opacity') -and $mainOverride[0].opacity) { [int]$mainOverride[0].opacity } else { $Opacity }
-$mainProfile = Set-TerminalProfile -Settings $settings -Name $ProfileName -SchemeName $mainTheme -ProfileStartingDirectory $mainDir -ProfileIcon $mainIcon -ProfileBackgroundImage $mainBackgroundImage -ProfileFontFace $mainFontFace -ProfileFontSize $mainFontSize -ProfileOpacity $mainOpacity -ProfileColorScheme $mainTheme
+$mainProfile = Set-TerminalProfile -Settings $settings -Name $ProfileName -SchemeName $mainTheme -ProfileStartingDirectory $mainDir -ProfileIcon $mainIcon -ProfileBackgroundImage $mainBackgroundImage -ProfileBackgroundImageOpacity $mainBackgroundImageOpacity -ProfileFontFace $mainFontFace -ProfileFontSize $mainFontSize -ProfileOpacity $mainOpacity -ProfileColorScheme $mainTheme
 foreach ($name in @($AdditionalProfileNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })) {
     $override = @($profileOverrides | Where-Object { $_.name -eq $name } | Select-Object -First 1)
     $profileTheme = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'colorScheme') -and $override[0].colorScheme) { "$($override[0].colorScheme)" } elseif ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'theme') -and $override[0].theme) { "$($override[0].theme)" } else { $effectiveTheme }
     $profileDir = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'startingDirectory') -and $override[0].startingDirectory) { "$($override[0].startingDirectory)" } else { $StartingDirectory }
     $profileIcon = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'icon') -and $override[0].icon) { "$($override[0].icon)" } else { '%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe' }
     $profileBackgroundImage = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'backgroundImage') -and $override[0].backgroundImage) { "$($override[0].backgroundImage)" } else { $BackgroundImage }
+    $profileBackgroundImageOpacity = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'backgroundImageOpacity') -and $null -ne $override[0].backgroundImageOpacity) { [double]$override[0].backgroundImageOpacity } else { $BackgroundImageOpacity }
     $profileFontFace = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'fontFace') -and $override[0].fontFace) { "$($override[0].fontFace)" } else { $FontFace }
     $profileFontSize = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'fontSize') -and $override[0].fontSize) { [int]$override[0].fontSize } else { $FontSize }
     $profileOpacity = if ($override.Count -gt 0 -and ($override[0].PSObject.Properties.Name -contains 'opacity') -and $override[0].opacity) { [int]$override[0].opacity } else { $Opacity }
-    [void](Set-TerminalProfile -Settings $settings -Name $name -SchemeName $profileTheme -ProfileStartingDirectory $profileDir -ProfileIcon $profileIcon -ProfileBackgroundImage $profileBackgroundImage -ProfileFontFace $profileFontFace -ProfileFontSize $profileFontSize -ProfileOpacity $profileOpacity -ProfileColorScheme $profileTheme)
+    [void](Set-TerminalProfile -Settings $settings -Name $name -SchemeName $profileTheme -ProfileStartingDirectory $profileDir -ProfileIcon $profileIcon -ProfileBackgroundImage $profileBackgroundImage -ProfileBackgroundImageOpacity $profileBackgroundImageOpacity -ProfileFontFace $profileFontFace -ProfileFontSize $profileFontSize -ProfileOpacity $profileOpacity -ProfileColorScheme $profileTheme)
 }
 
 if ($SetAsDefault) {
@@ -288,6 +294,9 @@ if (@($AdditionalProfileNames).Count -gt 0) {
 Write-Host "OK: theme: $effectiveTheme" -ForegroundColor Green
 Write-Host "OK: font: $FontFace ($FontSize)" -ForegroundColor Green
 Write-Host "OK: opacity: $Opacity" -ForegroundColor Green
+if (-not [string]::IsNullOrWhiteSpace($BackgroundImage)) {
+    Write-Host "OK: backgroundImageOpacity: $BackgroundImageOpacity" -ForegroundColor Green
+}
 Write-Host ''
 
 if (-not $NonInteractive) {

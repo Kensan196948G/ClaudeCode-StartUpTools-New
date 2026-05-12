@@ -1,0 +1,26 @@
+{
+  "_comment": "192.168.0.185:/home/kensan/Projects 配下に存在するプロジェクト一覧",
+  "host": "192.168.0.185",
+  "basePath": "/home/kensan/Projects",
+  "projects": [
+    "ActiveDirectory-Entry-Tools",
+    "AEGIS-SIGHT",
+    "Civil-Draw",
+    "CivilPDF-DX",
+    "Claudecode-Linux-Autonomous-Dev-Platform",
+    "ClaudeCode-StartUpTools-New",
+    "Construction-DX-One-System",
+    "Construction-DX-OS",
+    "Enterprise-AI-HelpDesk-System",
+    "Genesis-Devops-Platform",
+    "ITSM-Management",
+    "ITSM-System",
+    "Linux-Deploy-Management-System",
+    "OpenCodeSystem",
+    "PC-Ops-Orchestrator",
+    "Personal-Tech-Intelligence",
+    "ServiceHub-Construction-Platform",
+    "Synapse-OS",
+    "Windows-Deploy-Management-System"
+  ]
+}

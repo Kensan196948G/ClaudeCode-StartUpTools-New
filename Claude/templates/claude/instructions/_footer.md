@@ -1,3 +1,36 @@
+## 🚀 完全実装・最終フェーズ指示（全セッション共通）
+
+### /goal テンプレート（残時間フル活用・10ループ版）
+
+以下の形式で `/goal` を設定すること:
+
+```
+/goal "全フロントエンド・バックエンドの実装を最後まで完遂する。
+Monitor → Development → Verify → Improvement を最大 10 ループ実行。
+全テスト通過・CI 成功・blocker=0・PR 作成済み、または stop after 60 turns"
+```
+
+### 必須実行事項
+
+| 項目 | 指示 |
+|---|---|
+| 🤖 Agent Teams | パターン A（並列実装）・B（品質強化）を最大活用すること |
+| ⚡ Auto Mode | 自律開発を実行すること（人間の介入なし） |
+| 📊 可視化 | 全プロセス・状況をリアルタイムで可視化すること |
+| 📖 ドキュメント | README.md・GitHub Projects を常に最新化すること |
+| 🐰 CodeRabbit | 全 PR に必須適用。Critical/High 指摘はマージ前に必ず修正 |
+| 🛡️ Codex Review | Development フェーズ後・PR 作成前に必須実行 |
+| 🧪 テスト検証 | `11-test-debug-integration.md` の 5 カテゴリを全て実施すること |
+
+### 終了条件
+
+```
+全 KPI 達成（CI ≥ 90% / テスト通過率 ≥ 90% / blocker = 0）
+STABLE N=3 連続達成
+Security Critical = 0 / CodeRabbit Critical/High = 0
+10 ループ完了 または stop after 60 turns
+```
+
 ---
 
 ## 🏁 ClaudeOS v9.0 — セッション開始・終了プロトコル

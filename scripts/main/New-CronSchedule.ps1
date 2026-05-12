@@ -150,6 +150,8 @@ function Invoke-Register {
         Invoke-SyncLauncher
         # P1-2: state.json が存在しない場合は自動生成
         Invoke-EnsureStateJson -Project $project
+        # registration_date が未設定の既存 state.json に今日の日付を書込む（未設定時のみ）
+        Invoke-SetRegistrationDate -Project $project
         # START_PROMPT.md を最新テンプレートで同期（Invoke-EnsureStateJson 未呼出し時のフォールバック）
         Invoke-SyncStartPrompt -Project $project
     }
@@ -180,8 +182,10 @@ function Invoke-EnsureStateJson {
 {
   "project": {
     "name": "$Project",
+    "registration_date": "$today",
     "start_date": "$today",
     "release_deadline": "$releaseDeadline",
+    "duration_months": 6,
     "phase_mode": "development"
   },
   "goal": "$Project 自律開発",
@@ -221,6 +225,41 @@ function Invoke-EnsureStateJson {
     & $sshExe -T -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o ControlMaster=no `
         $LinuxHost "mkdir -p '$claudeDir'" 2>$null
     Invoke-SyncStartPrompt -Project $Project
+}
+
+function Invoke-SetRegistrationDate {
+    param([string]$Project)
+    $sshExe    = if ($env:AI_STARTUP_SSH_EXE) { $env:AI_STARTUP_SSH_EXE } else { 'ssh' }
+    $base      = $Config.linuxBase
+    $stateFile = "$base/$Project/state.json"
+    $today     = (Get-Date -Format 'yyyy-MM-dd')
+
+    # python3 で registration_date が null/空の場合のみ書込む
+    # 優先順位: registration_date → start_date（旧フォーマット） → today
+    $pyScript = @"
+import json, sys
+try:
+    with open('$stateFile') as f: d = json.load(f)
+    proj = d.get('project', {})
+    if not proj.get('registration_date'):
+        fallback = proj.get('start_date') or '$today'
+        proj['registration_date'] = fallback
+        d['project'] = proj
+        with open('$stateFile', 'w') as f: json.dump(d, f, indent=2, ensure_ascii=False)
+        print('set:' + fallback)
+    else:
+        print('already_set:' + str(proj['registration_date']))
+except Exception as e:
+    print('error:' + str(e), file=sys.stderr)
+"@
+    $escaped = $pyScript.Replace("'", "'\''").Replace([System.Environment]::NewLine, '; ')
+    $result = & $sshExe -T -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -o ControlMaster=no `
+        $LinuxHost "python3 -c '$escaped'" 2>$null
+    if ($result -like 'set:*') {
+        Write-Host "  [registration_date] state.json に設定しました: $($result -replace '^set:','')" -ForegroundColor Green
+    } elseif ($result -like 'already_set:*') {
+        Write-Host "  [registration_date] 設定済み: $($result -replace '^already_set:','')" -ForegroundColor DarkGray
+    }
 }
 
 function Invoke-SyncStartPrompt {

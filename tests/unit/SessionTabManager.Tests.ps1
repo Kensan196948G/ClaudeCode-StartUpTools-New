@@ -89,6 +89,32 @@ Describe 'New-SessionInfo, Save-SessionInfo, Get-SessionInfo' {
     }
 }
 
+Describe 'New-SessionInfo timeline fields' {
+
+    It 'タイムラインフィールドが session.json に保存されること' {
+        $sessDir = Join-Path $TestDrive 'sessions-timeline'
+        $session = New-SessionInfo -Project 'timelinetest' -ConfigSessionsDir $sessDir `
+            -ProjectRegistrationDate '2026-05-12' `
+            -ProjectReleaseDeadline  '2026-11-12' `
+            -ProjectDurationMonths   6
+        $session.project_registration_date | Should -Be '2026-05-12'
+        $session.project_release_deadline  | Should -Be '2026-11-12'
+        $session.project_duration_months   | Should -Be 6
+        $loaded = Get-SessionInfo -SessionId $session.sessionId -ConfigSessionsDir $sessDir
+        $loaded.project_registration_date  | Should -Be '2026-05-12'
+        $loaded.project_release_deadline   | Should -Be '2026-11-12'
+        $loaded.project_duration_months    | Should -Be 6
+    }
+
+    It '引数省略時は空文字 / デフォルト値となること' {
+        $sessDir = Join-Path $TestDrive 'sessions-timeline-default'
+        $session = New-SessionInfo -Project 'defaulttest' -ConfigSessionsDir $sessDir
+        $session.project_registration_date | Should -Be ''
+        $session.project_release_deadline  | Should -Be ''
+        $session.project_duration_months   | Should -Be 6
+    }
+}
+
 Describe 'Get-ActiveSession' {
 
     It 'returns null when sessions directory does not exist' {

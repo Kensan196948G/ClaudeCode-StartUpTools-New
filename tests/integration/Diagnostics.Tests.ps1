@@ -529,6 +529,41 @@ Describe 'setup-windows-terminal.ps1 non-interactive' {
         $terminalProfile.colorScheme | Should -Be 'Campbell'
         $terminalProfile.backgroundImage | Should -Be 'D:\Walls\ops.png'
     }
+
+    It '-BackgroundImageOpacity パラメータが backgroundImageOpacity に反映されること' {
+        $settingsPath = Join-Path $TestDrive 'wt-bgopacity\settings.json'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settingsPath) | Out-Null
+
+        $scriptPath = Join-Path $script:RepoRoot 'scripts\setup\setup-windows-terminal.ps1'
+        & $script:PowerShellExe -NoProfile -File $scriptPath -SettingsPath $settingsPath `
+            -BackgroundImage 'D:\Walls\photo.png' -BackgroundImageOpacity 0.45 -NonInteractive | Out-Null
+        $LASTEXITCODE | Should -Be 0
+
+        $settings = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $terminalProfile = ($settings.profiles.list | Where-Object name -eq 'AI CLI Startup')
+        $terminalProfile.backgroundImage | Should -Be 'D:\Walls\photo.png'
+        $terminalProfile.backgroundImageOpacity | Should -Be 0.45
+    }
+
+    It 'profile override で backgroundImageOpacity を個別指定できること' {
+        $settingsPath = Join-Path $TestDrive 'wt-bgopacity-override\settings.json'
+        $overridesPath = Join-Path $TestDrive 'wt-bgopacity-override\profiles.json'
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $settingsPath) | Out-Null
+        @'
+[
+  { "name": "AI CLI Main", "backgroundImage": "D:\\Walls\\ops.png", "backgroundImageOpacity": 0.55 }
+]
+'@ | Set-Content -Path $overridesPath -Encoding UTF8
+
+        $scriptPath = Join-Path $script:RepoRoot 'scripts\setup\setup-windows-terminal.ps1'
+        & $script:PowerShellExe -NoProfile -File $scriptPath -SettingsPath $settingsPath `
+            -ProfileName 'AI CLI Main' -BackgroundImageOpacity 0.20 -ProfileOverridesJsonPath $overridesPath -NonInteractive | Out-Null
+        $LASTEXITCODE | Should -Be 0
+
+        $settings = Get-Content $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $terminalProfile = ($settings.profiles.list | Where-Object name -eq 'AI CLI Main')
+        $terminalProfile.backgroundImageOpacity | Should -Be 0.55
+    }
 }
 
 Describe 'Start-Menu recent projects' {

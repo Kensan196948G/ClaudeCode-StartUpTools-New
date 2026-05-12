@@ -231,6 +231,33 @@ try {
     # --- Session Info Tab (v3.1.0) ---
     # session.json を生成して、Windows Terminal に情報タブを 1 枚開く。
     $sessionDurationMin = 300
+
+    # state.json からプロジェクト タイムライン情報を読み取る
+    $projRegDate   = ''
+    $projDeadline  = ''
+    $projDurMonths = 6
+    $localProjDir  = Join-Path $Config.projectsDir $Project
+    $stateJsonPath = Join-Path $localProjDir 'state.json'
+    if (Test-Path $stateJsonPath) {
+        try {
+            $st = Get-Content $stateJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($st.project) {
+                # registration_date 優先 → なければ旧フォーマットの start_date にフォールバック
+                if ($st.project.PSObject.Properties.Name -contains 'registration_date' -and $st.project.registration_date) {
+                    $projRegDate = [string]$st.project.registration_date
+                } elseif ($st.project.PSObject.Properties.Name -contains 'start_date' -and $st.project.start_date) {
+                    $projRegDate = [string]$st.project.start_date
+                }
+                if ($st.project.PSObject.Properties.Name -contains 'release_deadline' -and $st.project.release_deadline) {
+                    $projDeadline = [string]$st.project.release_deadline
+                }
+                if ($st.project.PSObject.Properties.Name -contains 'duration_months' -and $st.project.duration_months) {
+                    $projDurMonths = [int]$st.project.duration_months
+                }
+            }
+        } catch { }
+    }
+
     if ($Config.PSObject.Properties.Name -contains 'sessionTabs' -and $Config.sessionTabs.enabled) {
         try {
             $sessionsDir = if ($Config.sessionTabs.PSObject.Properties.Name -contains 'localSessionsDir') {
@@ -238,7 +265,10 @@ try {
             } else { '' }
 
             $session = New-SessionInfo -Project $Project -DurationMinutes $sessionDurationMin `
-                -Trigger 'manual' -Pid $PID -ConfigSessionsDir $sessionsDir
+                -Trigger 'manual' -Pid $PID -ConfigSessionsDir $sessionsDir `
+                -ProjectRegistrationDate $projRegDate `
+                -ProjectReleaseDeadline  $projDeadline `
+                -ProjectDurationMonths   $projDurMonths
             $env:CLAUDE_SESSION_ID = $session.sessionId
             $launchContext | Add-Member -NotePropertyName 'SessionId' -NotePropertyValue $session.sessionId -Force
 

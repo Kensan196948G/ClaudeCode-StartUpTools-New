@@ -1,0 +1,120 @@
+{
+  "_comment": "GitHub リポジトリ登録情報。プロジェクト名 → リポジトリ情報のマッピング。",
+  "githubUser": "Kensan196948G",
+  "projects": {
+    "ActiveDirectory-Entry-Tools": {
+      "url": "https://github.com/Kensan196948G/ActiveDirectory-Entry-Tools",
+      "private": true,
+      "description": "AD + Entra ID Connect + Entra ID + HENNGE One 構成のヘルプデスク・情シス向け Active Directory 運用管理 WebUI",
+      "language": "TypeScript"
+    },
+    "AEGIS-SIGHT": {
+      "url": "https://github.com/Kensan196948G/AEGIS-SIGHT",
+      "private": false,
+      "description": "SKYSEA Client View の内製代替として設計されたエンドポイント統制システム",
+      "language": "Python"
+    },
+    "Civil-Draw": {
+      "url": "https://github.com/Kensan196948G/Civil-Draw",
+      "private": false,
+      "description": "建設土木業に特化した WebベースのオープンソースCADツール",
+      "language": "TypeScript"
+    },
+    "CivilPDF-DX": {
+      "url": "https://github.com/Kensan196948G/CivilPDF-DX",
+      "private": false,
+      "description": "図面の赤入れ・承認フロー・電子納品チェックを一気通貫でカバーする建設業特化PDFプラットフォーム",
+      "language": "TypeScript"
+    },
+    "Claudecode-Linux-Autonomous-Dev-Platform": {
+      "url": "https://github.com/Kensan196948G/Claudecode-Linux-Autonomous-Dev-Platform",
+      "private": false,
+      "description": "Linux上で動作するClaudeCodeを中心とした複数プロジェクト対象の完全自律型AI開発基盤",
+      "language": "Python"
+    },
+    "ClaudeCode-StartUpTools-New": {
+      "url": "https://github.com/Kensan196948G/ClaudeCode-StartUpTools-New",
+      "private": false,
+      "description": "ClaudeCode 自動起動 DevTool",
+      "language": "PowerShell"
+    },
+    "Construction-DX-One-System": {
+      "url": "https://github.com/Kensan196948G/Construction-DX-One-System",
+      "private": false,
+      "description": "建設土木業界専用 DX プラットフォーム",
+      "language": "Python"
+    },
+    "Construction-DX-OS": {
+      "url": "https://github.com/Kensan196948G/Construction-DX-OS",
+      "private": false,
+      "description": "建設会社向けに最適化した Debian ベースの業務用クライアント基盤",
+      "language": "Python"
+    },
+    "Enterprise-AI-HelpDesk-System": {
+      "url": "https://github.com/Kensan196948G/Enterprise-AI-HelpDesk-System",
+      "private": false,
+      "description": "3段階AI処理パイプライン（Claude → Gemini → Perplexity）による次世代社内ヘルプデスク",
+      "language": "PowerShell"
+    },
+    "Genesis-Devops-Platform": {
+      "url": "https://github.com/Kensan196948G/Genesis-Devops-Platform",
+      "private": false,
+      "description": "AI（Claude Code）を中核とした要件定義〜運用準備までを完全自律で実行するAI開発組織OS",
+      "language": "Python"
+    },
+    "ITSM-Management": {
+      "url": "https://github.com/Kensan196948G/ITSM-Management",
+      "private": false,
+      "description": "ITIL ベースの企業内IT運用管理プラットフォーム（FastAPI + Vanilla JS SPA）",
+      "language": "HTML"
+    },
+    "ITSM-System": {
+      "url": "https://github.com/Kensan196948G/ITSM-System",
+      "private": false,
+      "description": "ITSM・NIST CSF 2.0 準拠システム・サービス運用管理システム",
+      "language": "JavaScript"
+    },
+    "Linux-Deploy-Management-System": {
+      "url": "",
+      "private": false,
+      "description": "",
+      "language": ""
+    },
+    "OpenCodeSystem": {
+      "url": "https://github.com/Kensan196948G/OpenCodeSystem",
+      "private": false,
+      "description": "OpenCode + DeepSeek V4 を利用した完全自律開発システム",
+      "language": "Shell"
+    },
+    "PC-Ops-Orchestrator": {
+      "url": "https://github.com/Kensan196948G/PC-Ops-Orchestrator",
+      "private": false,
+      "description": "HTTPS（443）のみを使用した安全な情報収集と WebUI による一元管理・遠隔操作を実現する運用基盤",
+      "language": "PowerShell"
+    },
+    "Personal-Tech-Intelligence": {
+      "url": "https://github.com/Kensan196948G/Personal-Tech-Intelligence",
+      "private": false,
+      "description": "IT・DX・AI技術に関する最新情報および個人ナレッジを統合・自動管理する個人専用インテリジェンスプラットフォーム",
+      "language": "Python"
+    },
+    "ServiceHub-Construction-Platform": {
+      "url": "https://github.com/Kensan196948G/ServiceHub-Construction-Platform",
+      "private": false,
+      "description": "工事案件を中心に日報・安全管理・原価管理・ナレッジを一元管理する統合型建設業向けサービスプラットフォーム",
+      "language": "TypeScript"
+    },
+    "Synapse-OS": {
+      "url": "https://github.com/Kensan196948G/Synapse-OS",
+      "private": true,
+      "description": "",
+      "language": "Python"
+    },
+    "Windows-Deploy-Management-System": {
+      "url": "https://github.com/Kensan196948G/Windows-Deploy-Management-System",
+      "private": false,
+      "description": "WDS-less Linux-based Windows 11 deployment management platform — Flask + Vue.js 3 + iPXE + MDT",
+      "language": "Vue"
+    }
+  }
+}

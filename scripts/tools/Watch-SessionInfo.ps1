@@ -69,6 +69,66 @@ function Get-StatusColor {
     }
 }
 
+function Get-ProjectPhase {
+    param([int]$Week)
+    if ($Week -le  8) { return @{ Name='Build';     Range='Week 1-8';   WeekInPhase=$Week;                          PhaseWeeks=8 } }
+    if ($Week -le 16) { return @{ Name='Quality';   Range='Week 9-16';  WeekInPhase=$Week-8;                        PhaseWeeks=8 } }
+    if ($Week -le 20) { return @{ Name='Stabilize'; Range='Week 17-20'; WeekInPhase=$Week-16;                       PhaseWeeks=4 } }
+    return               @{ Name='Release';   Range='Week 21-24'; WeekInPhase=[Math]::Min($Week-20,4); PhaseWeeks=4 }
+}
+
+function New-ProgressBar {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Factory function returns in-memory string; no persistent state is modified')]
+    param([double]$Pct, [int]$Width = 20)
+    $filled = [int][Math]::Round($Pct / 100 * $Width)
+    $filled = [Math]::Max(0, [Math]::Min($filled, $Width))
+    $bar = ('=' * $Width).ToCharArray()
+    if ($filled -lt $Width) {
+        for ($i = 0; $i -lt $Width; $i++) { $bar[$i] = if ($i -lt $filled) { '=' } else { ' ' } }
+        $bar[$filled] = [char]'o'
+    }
+    return "[{0}]" -f (-join $bar)
+}
+
+function Show-ProjectTimeline {
+    param([pscustomobject]$Session)
+
+    $regDateStr  = if ($Session.PSObject.Properties.Name -contains 'project_registration_date') { "$($Session.project_registration_date)" } else { '' }
+    $deadlineStr = if ($Session.PSObject.Properties.Name -contains 'project_release_deadline')  { "$($Session.project_release_deadline)"  } else { '' }
+    $durMonths   = if ($Session.PSObject.Properties.Name -contains 'project_duration_months' -and $Session.project_duration_months) { [int]$Session.project_duration_months } else { 6 }
+
+    if ([string]::IsNullOrWhiteSpace($regDateStr)) { return }
+
+    try { $regDate = [datetime]::Parse($regDateStr) } catch { return }
+
+    $today     = [datetime]::Today
+    $totalDays = if (-not [string]::IsNullOrWhiteSpace($deadlineStr)) {
+        try { ([datetime]::Parse($deadlineStr) - $regDate).TotalDays } catch { $durMonths * 30.44 }
+    } else { $durMonths * 30.44 }
+
+    $elapsed    = [Math]::Max(0, ($today - $regDate).TotalDays)
+    $remaining  = $totalDays - $elapsed
+    $pct        = [Math]::Min(100, [Math]::Max(0, $elapsed / $totalDays * 100))
+    $week       = [int][Math]::Max(1, [Math]::Ceiling($elapsed / 7))
+    $totalWeeks = [int][Math]::Ceiling($totalDays / 7)
+    $phase      = Get-ProjectPhase -Week $week
+
+    $deadlineDisplay = if (-not [string]::IsNullOrWhiteSpace($deadlineStr)) { $deadlineStr } else { "+${durMonths}M" }
+    $remainColor     = if ($remaining -lt 30) { 'Red' } elseif ($remaining -lt 60) { 'Yellow' } else { 'Green' }
+
+    Write-Host ("  " + ([char]9552).ToString() * 52) -ForegroundColor DarkCyan
+    Write-Host ("   [Timeline] Project Timeline") -ForegroundColor Cyan
+    Write-Host ("  " + ([char]9472).ToString() * 52) -ForegroundColor DarkCyan
+    Write-Host ("   登録開始: $regDateStr   期限: $deadlineDisplay") -ForegroundColor White
+    Write-Host ("   Week $week / $totalWeeks  >  $($phase.Name) Phase  ($($phase.Range))") -ForegroundColor Yellow
+    Write-Host ""
+    $bar = New-ProgressBar -Pct $pct
+    Write-Host ("   全体  $bar  {0:0}%  ({1:0}日 / {2:0}日)" -f $pct, $elapsed, $totalDays) -ForegroundColor Green
+    Write-Host ("   残り  {0:0} 日  ($deadlineDisplay まで)" -f $remaining) -ForegroundColor $remainColor
+    Write-Host ("  " + ([char]9552).ToString() * 52) -ForegroundColor DarkCyan
+    Write-Host ""
+}
+
 function Show-SessionFrame {
     param([pscustomobject]$Session)
 
@@ -91,6 +151,7 @@ function Show-SessionFrame {
     Write-Host ("   $title") -ForegroundColor Cyan
     Write-Host ("  " + "=" * 52) -ForegroundColor Cyan
     Write-Host ""
+    Show-ProjectTimeline -Session $Session
     Write-Host ("   Session ID : " + $Session.sessionId) -ForegroundColor DarkGray
     Write-Host ("   Trigger    : " + $Session.trigger) -ForegroundColor Gray
     Write-Host ""
