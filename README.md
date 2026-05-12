@@ -2,10 +2,13 @@
 
 > Windows から **Claude Code** を中心とした自律開発環境を立ち上げるためのスタートアップツールです。
 
-`ClaudeOS v8` (Agent Teams / Boot Sequence / Self Evolution / Architecture Check / Issue Factory / CodeRabbit Review / Weekly Optimized Loops) をカーネルに据え、ローカル起動・SSH リモート起動・診断・Pester テスト・GitHub Issues / Projects / Actions 連携を一括提供します。
+`ClaudeOS v9.0` (/goal 駆動 / Agent Teams / Agent View / Boot Sequence / Self Evolution / Architecture Check / Issue Factory / CodeRabbit Review / Dynamic Orchestration) をカーネルに据え、ローカル起動・SSH リモート起動・診断・Pester テスト・GitHub Issues / Projects / Actions 連携を一括提供します。
 
 > **📌 v3.1.0 で Claude Code 専用ツールに整理**
 > v3.1.0 より、Codex CLI / GitHub Copilot CLI の起動メニュー (S2/S3/L2/L3) は削除されました。本ツールは **Claude Code 専用の自律開発ランチャー** として位置づけを明確化し、Linux crontab 連携・セッション情報タブ・Statusline グローバル適用などの新機能に投資が集中しています。
+
+> **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
+> Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
 > **🧪 v3.2.107 — WebUI 全テスト検証 250 項目を全プロジェクト実行の最終プロンプトに追加**
 > フロントエンド 110 項目 ＋ バックエンド 140 項目（AI 開発系検証含む）の 250 項目チェックリストを `10-webui-final-verification.md` として追加し、全プロジェクトの START_PROMPT.md 末尾に自動組み込み。詳細は [`CHANGELOG.md`](./CHANGELOG.md) を参照。
@@ -17,7 +20,7 @@
 
 | ツール | 提供元 | 位置付け | 主な用途 |
 |--------|--------|---------|---------|
-| 🌟 **Claude Code** | Anthropic | **唯一の起動対象** — ClaudeOS v8 統合 / Agent Teams / Boot Sequence / 自律開発ループ | 大規模なコード修正、レビュー、自律開発、Issue/PR 自動化、Linux cron による週次自律実行 |
+| 🌟 **Claude Code** | Anthropic | **唯一の起動対象** — ClaudeOS v9.0 統合 / `/goal` 駆動 / Agent Teams / Agent View / Boot Sequence / 動的自律開発 | 大規模なコード修正、レビュー、自律開発、Issue/PR 自動化、Linux cron による週次自律実行 |
 
 > v3.1.0 以降、Codex CLI / GitHub Copilot CLI の起動メニューは提供しません。`Start-CodexCLI.ps1` / `Start-CopilotCLI.ps1` ファイル自体はリポジトリ内に残していますが、`config.json` の `tools.codex.enabled = false` / `tools.copilot.enabled = false` で無効化されています。
 
@@ -30,7 +33,7 @@
 | バージョン | **v3.2.107** (WebUI 全テスト検証 250 項目 全プロジェクト最終プロンプト追加) — 旧: v3.2.106 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
-| ClaudeOS (Claude Code 専用) | v8 (Opus 4.7 最適化 / Token 1.35x 補正 / Agent Teams 並列 spawn / `/compact` 事前発動 / `task_budget` / 1H cache / `/ultrareview` / PreCompact hook / `/recap` fallback / Push Notification / Effort 動的切替) |
+| ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |
 | Agents | **28体** の特化サブエージェント (2026Q2 棚卸し後、追加復元済み) |
 | Skills | **0個** — Claude Opus 4.6 内包能力で代替可能な汎用スキルを棚卸しで全削除 |
 | Hooks | **4個** — agent-risk-check / capture-result / onboarding-refresh / usage-history-recorder |
@@ -78,9 +81,9 @@
 
 | Hook | 種別 | スクリプト | 機能 |
 |------|------|-----------|------|
-| `session-start` | SessionStart | `session-start.js` | state.json から前回フェーズ・STABLE状態を読み込み表示。`current_session_start_at` と trigger (cron/manual) を書き込み |
+| `session-start` | SessionStart | `session-start.js` | state.json 読み込み・週次フェーズ自動計算（v9.0）・KPI サマリー表示・blocked_issues 一覧表示・`current_session_start_at` / trigger 書き込み |
 | `pre-compact` | PreCompact | `pre-compact.js` | compact 直前に state.json へタイムスタンプを記録 |
-| `session-end` | Stop | `session-end.js` | `last_stop_at` を state.json へ書き込み後、STABLE 通知を実行 |
+| `session-end` | Stop | `session-end.js` | `last_stop_at` 書き込み・learning パターン記録（v9.0: 成功/失敗パターンを `state.learning` へ追記）・STABLE 通知実行 |
 | `usage-tracker` | PostToolUse (Agent) | `usage-tracker.js` | Agent ツール呼び出しを検出し `learning.usage_history.agents` へ使用実績を記録 |
 
 ### Skills 構成

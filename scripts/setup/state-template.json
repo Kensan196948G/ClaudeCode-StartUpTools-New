@@ -1,0 +1,56 @@
+{
+  "project": {
+    "name": "YOUR_PROJECT_NAME",
+    "start_date": "2026-01-01",
+    "release_deadline": "2026-07-01",
+    "phase_mode": "development"
+  },
+  "goal": "",
+  "phase": "Monitor",
+  "kpi": {
+    "success_rate_target": 0.9,
+    "ci_success_rate": 0.0,
+    "test_pass_rate": 0.0,
+    "security_critical": 0,
+    "blocker_count": 0
+  },
+  "execution": {
+    "max_duration_minutes": 300,
+    "repair_count": 0,
+    "max_repair": 3,
+    "same_error_limit": 2,
+    "phase": "Monitor",
+    "last_session_summary": ""
+  },
+  "automation": {
+    "auto_issue_generation": true,
+    "self_evolution": true
+  },
+  "stable": {
+    "stable_achieved": false,
+    "consecutive_success": 0
+  },
+  "token": {
+    "used": 0,
+    "remaining": 100
+  },
+  "compact": {},
+  "dreaming": {
+    "patterns": [],
+    "curated_memories": [],
+    "recurring_mistakes": [],
+    "last_dreaming_run": null,
+    "dreaming_enabled": false
+  },
+  "completed_issues": [],
+  "blocked_issues": [],
+  "learning": {
+    "failure_patterns": [],
+    "success_patterns": []
+  },
+  "warnings": [],
+  "quality_gates": {
+    "lint": { "warning_threshold": 10, "error_threshold": 0 },
+    "coverage": { "line_min": 70, "changed_files_min": 80 }
+  }
+}
