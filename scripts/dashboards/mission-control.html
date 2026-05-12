@@ -277,14 +277,7 @@ const EVENT_LOG = [
 
 Object.assign(window, { MOCK_STATE, AGENTS_DATA, CI_WORKFLOWS, RECENT_PRS, OPEN_ISSUES, CRON_SCHEDULES, BOOT_STEPS, PHASE_TIMELINE, EVENT_LOG });
 
-// 実データフェッチ（サーバーが /api/mc-data を提供している場合）
-fetch('/api/mc-data').then(r => r.json()).then(data => {
-  if (data.state) Object.assign(window.MOCK_STATE, data.state);
-  if (data.cronSchedules) window.CRON_SCHEDULES = data.cronSchedules;
-  if (data.workflows) window.CI_WORKFLOWS = data.workflows;
-  if (data.prs) window.RECENT_PRS = data.prs;
-  if (data.issues) window.OPEN_ISSUES = data.issues;
-}).catch(() => { /* モックデータで継続 */ });
+// /api/mc-data のポーリングは App コンポーネントが一元管理する（30秒ごと）
   </script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -407,7 +400,7 @@ function Tag({ children, color, bg }) {
 }
 window.Tag = Tag;
 
-function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark }) {
+function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark, lastUpdated }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => { setNow(new Date()); setSessionElapsed(prev => prev + 1/60); }, 1000);
@@ -418,6 +411,9 @@ function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDa
   const remainM = Math.floor(remaining % 60);
   const remainS = Math.floor((remaining % 1) * 60);
   const pctElapsed = sessionElapsed / state.execution.max_duration_minutes;
+  const updStr = lastUpdated
+    ? lastUpdated.toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit", second:"2-digit" })
+    : "—";
   return (
     <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:48, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, flexShrink:0, gap:16 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
@@ -445,6 +441,11 @@ function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDa
         </div>
         <div style={{ fontSize:11, fontFamily:MC.mono, color:MC.textDim }}>
           Phase: <span style={{ color:"#00d4aa" }}>{state.execution.phase}</span>
+        </div>
+        {/* 最終データ更新時刻 */}
+        <div style={{ fontSize:9, fontFamily:MC.mono, color:MC.textMuted, display:"flex", alignItems:"center", gap:3 }}>
+          <span style={{ color: lastUpdated ? MC.green : MC.textMuted }}>●</span>
+          <span>{updStr}</span>
         </div>
         <button onClick={onToggleDark} title={darkMode ? "ライトモード" : "ダークモード"}
           style={{ width:34, height:34, borderRadius:8, border:`1px solid ${MC.border}`, background:MC.bgCard, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:16, color:MC.text }}
@@ -884,10 +885,11 @@ window.DashboardPanel = DashboardPanel;
        BLOCK 5: Agent Teams Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const AgentsPanel = ({ state }) => {
+const AgentsPanel = ({ state, liveData }) => {
   const [selectedAgent, setSelectedAgent] = React.useState(null);
   const [teamPattern, setTeamPattern] = React.useState("A");
-  const agents = window.AGENTS_DATA;
+  // liveData.agentTeams があれば実データを優先、なければモック
+  const agents = (liveData?.agentTeams?.length ? liveData.agentTeams : null) || window.AGENTS_DATA;
   const statusCounts = { working:0, idle:0, completed:0 };
   agents.forEach(a => { statusCounts[a.status] = (statusCounts[a.status] || 0) + 1; });
   return (
@@ -987,11 +989,12 @@ window.AgentsPanel = AgentsPanel;
        BLOCK 6: CI/CD & GitHub Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const CICDPanel = () => {
+const CICDPanel = ({ liveData }) => {
   const [tab, setTab] = React.useState("workflows");
-  const workflows = window.CI_WORKFLOWS;
-  const prs = window.RECENT_PRS;
-  const issues = window.OPEN_ISSUES;
+  // liveData があれば実データを優先
+  const workflows = (liveData?.ciWorkflows?.length ? liveData.ciWorkflows : null) || window.CI_WORKFLOWS;
+  const prs       = (liveData?.recentPRs?.length   ? liveData.recentPRs   : null) || window.RECENT_PRS;
+  const issues    = (liveData?.openIssues?.length   ? liveData.openIssues  : null) || window.OPEN_ISSUES;
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:12, height:"100%" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -1169,19 +1172,16 @@ function formatNextRunDisplay(nextRunStr, expr) {
   return "—";
 }
 
-const CronPanel = () => {
+const CronPanel = ({ liveData }) => {
   const [schedules, setSchedules] = React.useState(window.CRON_SCHEDULES);
   const [showAdd, setShowAdd] = React.useState(false);
 
-  // Sync with window.CRON_SCHEDULES after async fetch completes
+  // liveData.cronSchedules が更新されたら即座に同期（30秒ポーリング連動）
   React.useEffect(() => {
-    const tid = setTimeout(() => {
-      if (window.CRON_SCHEDULES && window.CRON_SCHEDULES !== schedules) {
-        setSchedules([...window.CRON_SCHEDULES]);
-      }
-    }, 1500);
-    return () => clearTimeout(tid);
-  }, []);
+    if (liveData?.cronSchedules?.length) {
+      setSchedules([...liveData.cronSchedules]);
+    }
+  }, [liveData?.cronSchedules]);
 
   const togglePause = (idx) => setSchedules(prev =>
     prev.map((s,i) => i===idx ? {...s, status: s.status==="active" ? "paused" : "active"} : s)
@@ -1411,8 +1411,8 @@ window.CronPanel = CronPanel;
        BLOCK 8: Boot Sequence Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const BootPanel = ({ state }) => {
-  const steps = window.BOOT_STEPS;
+const BootPanel = ({ state, liveData }) => {
+  const steps = (liveData?.bootSteps?.length ? liveData.bootSteps : null) || window.BOOT_STEPS;
   const [expandedStep, setExpandedStep] = React.useState(null);
   const completedCount = steps.filter(s => s.status === "completed").length;
   const runningCount = steps.filter(s => s.status === "running").length;
@@ -1495,8 +1495,8 @@ window.BootPanel = BootPanel;
        BLOCK 9: Event Log Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const LogPanel = () => {
-  const logs = window.EVENT_LOG;
+const LogPanel = ({ liveData }) => {
+  const logs = (liveData?.eventLog?.length ? liveData.eventLog : null) || window.EVENT_LOG;
   const [filter, setFilter] = React.useState("all");
   const [autoScroll, setAutoScroll] = React.useState(true);
   const logRef = React.useRef(null);
@@ -1555,6 +1555,9 @@ const App = () => {
   const [activePanel, setActivePanel] = React.useState("projects");
   const [sessionElapsed, setSessionElapsed] = React.useState(window.MOCK_STATE.execution.elapsed_minutes);
   const [, forceRender] = React.useState(0);
+  // liveData: 30秒ごとに /api/mc-data から取得した実データ
+  const [liveData, setLiveData] = React.useState(null);
+  const [lastUpdated, setLastUpdated] = React.useState(null);
 
   React.useEffect(() => {
     applyTheme(t.darkMode);
@@ -1566,16 +1569,29 @@ const App = () => {
     forceRender(n => n + 1);
   }, [t.accentColor]);
 
+  // 単一の 30秒ポーリング — 全パネルに liveData を供給
+  React.useEffect(() => {
+    const fetchAll = () => {
+      fetch('/api/mc-data')
+        .then(r => r.json())
+        .then(d => { setLiveData(d); setLastUpdated(new Date()); })
+        .catch(() => { /* モックデータで継続 */ });
+    };
+    fetchAll();
+    const tid = setInterval(fetchAll, 30000);
+    return () => clearInterval(tid);
+  }, []);
+
   const renderPanel = () => {
-    const state = window.MOCK_STATE;
+    const state = liveData?.state || window.MOCK_STATE;
     switch (activePanel) {
       case "projects":  return <ProjectsPanel />;
       case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} />;
-      case "agents":    return <AgentsPanel state={state} />;
-      case "cicd":      return <CICDPanel />;
-      case "cron":      return <CronPanel />;
-      case "boot":      return <BootPanel state={state} />;
-      case "log":       return <LogPanel />;
+      case "agents":    return <AgentsPanel state={state} liveData={liveData} />;
+      case "cicd":      return <CICDPanel liveData={liveData} />;
+      case "cron":      return <CronPanel liveData={liveData} />;
+      case "boot":      return <BootPanel state={state} liveData={liveData} />;
+      case "log":       return <LogPanel liveData={liveData} />;
       default:          return <ProjectsPanel />;
     }
   };
@@ -1586,7 +1602,8 @@ const App = () => {
         <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, pointerEvents:"none", zIndex:1000, background:"repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)" }} />
       )}
       <TopBar state={window.MOCK_STATE} sessionElapsed={sessionElapsed} setSessionElapsed={setSessionElapsed}
-        darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)} />
+        darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)}
+        lastUpdated={lastUpdated} />
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <SideNav active={activePanel} onChange={setActivePanel} />
         <main style={{ flex:1, padding:16, overflow:"auto", animation: t.animationsEnabled ? "mcFadeIn 0.3s ease" : "none" }} key={activePanel}>
