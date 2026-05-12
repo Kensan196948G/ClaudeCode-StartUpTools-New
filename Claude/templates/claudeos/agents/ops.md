@@ -1,4 +1,4 @@
----
+﻿---
 name: ops
 description: インフラ・デプロイ管理担当。STABLE判定後のdeploy実行、環境管理、障害検知を行う。
 tools: Read, Write, Edit, Bash, Grep, Glob
@@ -30,3 +30,14 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 
 - DevOps（CI/CD 連携）
 - ReleaseManager（デプロイ判断）
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```

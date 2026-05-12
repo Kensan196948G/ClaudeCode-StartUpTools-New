@@ -12,6 +12,8 @@ $script:CoreRoles = @(
     [pscustomobject]@{ role = 'Security';   emoji = '🔐'; agents = @('security', 'security-reviewer') }
     [pscustomobject]@{ role = 'DevOps';     emoji = '🚀'; agents = @('ops', 'release-manager') }
     [pscustomobject]@{ role = 'Reviewer';   emoji = '🔎'; agents = @('code-reviewer') }
+    [pscustomobject]@{ role = 'CMDB';       emoji = '🗄️'; agents = @('cmdb-agent') }
+    [pscustomobject]@{ role = 'Audit';      emoji = '📋'; agents = @('audit-agent') }
 )
 
 $script:TaskTypePatterns = @(
@@ -24,6 +26,8 @@ $script:TaskTypePatterns = @(
     [pscustomobject]@{ type = 'refactor';  pattern = 'refactor|リファクタ|整理|命名|技術負債';                  agents = @('refactor-cleaner') }
     [pscustomobject]@{ type = 'docs';      pattern = 'docs|README|ドキュメント|documentation';                  agents = @('doc-updater') }
     [pscustomobject]@{ type = 'incident';  pattern = 'incident|障害|緊急|ダウン|復旧';                          agents = @('incident-triager', 'build-error-resolver') }
+    [pscustomobject]@{ type = 'cmdb';     pattern = 'CMDB|構成管理|構成アイテム|CI台帳|asset|依存関係マップ';   agents = @('cmdb-agent') }
+    [pscustomobject]@{ type = 'audit';    pattern = 'audit|監査|コンプライアンス|ISO|J-SOX|NIST|証跡|非準拠';  agents = @('audit-agent', 'security-reviewer') }
     [pscustomobject]@{ type = 'typescript';pattern = 'TypeScript|ts|tsx|Node\.js';                              agents = @('typescript-reviewer') }
     [pscustomobject]@{ type = 'python';    pattern = 'Python|Django|Flask|FastAPI|pip';                         agents = @('python-reviewer') }
     [pscustomobject]@{ type = 'go';        pattern = 'Go|golang|go\.mod';                                      agents = @('go-reviewer', 'go-build-resolver') }
