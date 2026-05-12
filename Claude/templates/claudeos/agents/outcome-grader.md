@@ -1,4 +1,4 @@
----
+﻿---
 name: outcome-grader
 description: Verify フェーズ末尾で stable-rubric.json の全 criteria を機械的に採点し、
              STABLE 合否を判定する Outcomes 統合グレーダー。人間レビューを介さない
@@ -67,3 +67,14 @@ tools: Read, Bash, Grep, Glob
 - `.claude/claudeos/docs/webui-full-verification-checklist.md` — Gate-1 / Gate-2 チェックリスト
 - `system/role-contracts.md` — 返却フォーマット詳細
 - `CLAUDE.md §9` — STABLE 判定の運用規約
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```

@@ -1,4 +1,4 @@
----
+﻿---
 name: ci-manager
 description: CI管理・修復担当。CI失敗の原因分析・自動修復・最大15回リトライ制御を行う。
 tools: Read, Write, Edit, Bash, Grep, Glob
@@ -38,3 +38,14 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 - Tester（テスト実行確認）
 - Debugger（原因分析）
 - Orchestrator（Blocked 報告）
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```

@@ -1,4 +1,4 @@
-# Architect Agent
+﻿# Architect Agent
 
 Responsible for system architecture integrity.
 
@@ -31,3 +31,14 @@ Responsible for system architecture integrity.
 ## Collaboration
 - DevAPI / DevUI と密接連携
 - CTO判断に従う
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```

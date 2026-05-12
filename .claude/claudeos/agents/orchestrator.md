@@ -1,4 +1,4 @@
-# Agent Orchestrator
+﻿# Agent Orchestrator
 
 Coordinates Agent Teams.
 
@@ -65,3 +65,14 @@ full への昇格はリードエージェントが理由を明示する。
 - `system/role-contracts.md` — Orchestrator-Subagent パターン詳細
 - `CLAUDE.md §6` — Agent Teams 起動チェーン
 - `system/loop-guard.md` — 停止条件・Loop Guard
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```

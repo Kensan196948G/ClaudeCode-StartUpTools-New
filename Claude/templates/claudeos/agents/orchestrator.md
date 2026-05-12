@@ -1,4 +1,4 @@
----
+﻿---
 name: orchestrator
 description: Agent Teams全体を調整し、Monitor→Build→Verify→Improveのループを制御するオーケストレーター。STABLE判定の最終確認と各エージェントへの委任を管理する。
 tools: Read, Write, Edit, Bash, Grep, Glob
@@ -71,3 +71,14 @@ score = 0  → 終了
 - Blocked（同一エラー 3 回）
 - Token 枯渇
 - Security blocker 検知
+
+## 停止理由出力（Agent View 可視化）
+
+タスク完了・中断・エラー時は必ず末尾に以下を出力する:
+
+```
+[停止理由]
+- 状態: 完了 / 中断 / エラー待ち / ブロック
+- 理由: <具体的な理由 1行>
+- 次アクション: <引き継ぎ先または次ステップ>
+```
