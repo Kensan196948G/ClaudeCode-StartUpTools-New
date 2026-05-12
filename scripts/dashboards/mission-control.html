@@ -677,7 +677,12 @@ const ProjectsPanel = () => {
   const all    = projData.projects;
   const cronPs = all.filter(p => p.hasCron);
   const otherPs= all.filter(p => !p.hasCron);
-  const displayed = filter==="cron" ? cronPs : filter==="other" ? otherPs : null;
+  const displayed =
+    filter==="cron"   ? cronPs :
+    filter==="other"  ? otherPs :
+    filter==="linux"  ? all.filter(p => p.hasLinux) :
+    filter==="github" ? all.filter(p => p.hasGithub) :
+    null; // null = 全件 (セクション分割表示)
 
   const secHdr = (label, count) => (
     <tr>
@@ -698,8 +703,8 @@ const ProjectsPanel = () => {
           { label:"全プロジェクト", v:all.length,                              c:MC.accent,  id:"all"   },
           { label:"Cron 稼働中",   v:cronPs.length,                           c:MC.green,   id:"cron"  },
           { label:"簡易表示",      v:otherPs.length,                          c:MC.textMuted,id:"other" },
-          { label:"Linux",         v:all.filter(p=>p.hasLinux).length,        c:MC.cyan     },
-          { label:"GitHub",        v:all.filter(p=>p.hasGithub).length,       c:MC.purple   },
+          { label:"Linux",         v:all.filter(p=>p.hasLinux).length,        c:MC.cyan,    id:"linux"  },
+          { label:"GitHub",        v:all.filter(p=>p.hasGithub).length,       c:MC.purple,  id:"github" },
         ].map(({ label, v, c, id }) => (
           <div key={label}
             onClick={id ? () => setFilter(f => f===id ? "all" : id) : undefined}
