@@ -247,9 +247,9 @@ Describe 'New-AgentTeam' {
     }
 
     Context 'Core Team の構成' {
-        It '7 つの Core Role が含まれること' {
+        It '9 つの Core Role が含まれること (CMDB / Audit を含む)' {
             $team = New-AgentTeam -TaskDescription 'general task' -AgentsDir $script:AgentsDir -RulesPath $script:RulesPath
-            @($team.coreTeam).Count | Should -Be 7
+            @($team.coreTeam).Count | Should -Be 9
         }
 
         It 'CTO ロールが含まれること' {
