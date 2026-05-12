@@ -173,20 +173,43 @@ function Invoke-EnsureStateJson {
         return
     }
 
-    Write-Host "  [state.json] 未検出 — 最小構成を生成中..." -ForegroundColor Cyan
+    Write-Host "  [state.json] 未検出 — v9.0 スキーマで生成中..." -ForegroundColor Cyan
+    $today = (Get-Date -Format 'yyyy-MM-dd')
+    $releaseDeadline = (Get-Date).AddMonths(6).ToString('yyyy-MM-dd')
     $minimalState = @"
 {
-  "goal": { "title": "$Project 自律開発" },
-  "kpi": { "success_rate_target": 0.9 },
+  "project": {
+    "name": "$Project",
+    "start_date": "$today",
+    "release_deadline": "$releaseDeadline",
+    "phase_mode": "development"
+  },
+  "goal": "$Project 自律開発",
+  "phase": "Monitor",
+  "kpi": {
+    "success_rate_target": 0.9,
+    "ci_success_rate": 0.0,
+    "test_pass_rate": 0.0,
+    "security_critical": 0,
+    "blocker_count": 0
+  },
   "execution": {
     "max_duration_minutes": $duration,
+    "repair_count": 0,
+    "max_repair": 3,
+    "same_error_limit": 2,
     "phase": "Monitor",
-    "auto_stop_threshold": 5,
-    "graceful_shutdown": true,
     "last_session_summary": ""
   },
+  "automation": { "auto_issue_generation": true, "self_evolution": true },
   "stable": { "consecutive_success": 0, "target_n": 3, "stable_achieved": false },
-  "automation": { "auto_issue_generation": true, "self_evolution": true }
+  "completed_issues": [],
+  "blocked_issues": [],
+  "learning": { "failure_patterns": [], "success_patterns": [] },
+  "quality_gates": {
+    "lint": { "warning_threshold": 10, "error_threshold": 0 },
+    "coverage": { "line_min": 70, "changed_files_min": 80 }
+  }
 }
 "@
     $escapedState = $minimalState.Replace("'", "'\''")
