@@ -99,6 +99,64 @@
         "self_evolution": { "type": "boolean" }
       }
     },
+    "operation_mode": {
+      "type": "object",
+      "description": "ClaudeOS v8.3+ three-tier operation mode. See CLAUDE.md §3 / .claude/claudeos/system/conducted-mode.md.",
+      "properties": {
+        "current": {
+          "type": "string",
+          "enum": ["cron_autonomous", "manual_subagent", "conducted"],
+          "description": "cron_autonomous=Linux cron unattended SubAgent / manual_subagent=interactive SubAgent / conducted=official Agent Teams + Agent View"
+        },
+        "conducted": {
+          "type": "object",
+          "description": "Conducted mode (official Agent Teams + Agent View) configuration. Active only when current='conducted'.",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "lead_session_started_at": { "type": ["string", "null"], "format": "date-time" },
+            "max_session_minutes": { "type": "integer", "minimum": 1, "maximum": 300, "description": "Recommended ≤ 240 to ensure graceful shutdown completes before 5h hard limit" },
+            "graceful_shutdown_threshold_minutes": { "type": "integer", "minimum": 5, "description": "Minutes before max_session to start graceful shutdown" },
+            "spawn_token_threshold_pct": { "type": "integer", "minimum": 0, "maximum": 100, "description": "If token usage exceeds this %, no new teammate spawn allowed" },
+            "spawn_freeze_remaining_minutes": { "type": "integer", "minimum": 0, "description": "If remaining session minutes below this, no new teammate spawn allowed" }
+          }
+        }
+      }
+    },
+    "agent_teams": {
+      "type": "object",
+      "description": "Mirror of conducted-mode teammate state. Written by session-end.js (Stop hook) and lead CTO during phase transitions. Used to restore spawn plan on next session (teammates themselves cannot be resumed per official constraint).",
+      "properties": {
+        "last_snapshot_at": { "type": ["string", "null"], "format": "date-time" },
+        "active_team_id": { "type": ["string", "null"] },
+        "teammates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["role", "status"],
+            "properties": {
+              "role": {
+                "type": "string",
+                "enum": [
+                  "CTO", "ProductManager", "Architect", "Developer", "Reviewer",
+                  "Debugger", "QA", "Security", "DevOps", "Analyst",
+                  "EvolutionManager", "ReleaseManager",
+                  "e2e-runner", "security-reviewer", "PerformanceReviewer"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": ["working", "needs_input", "completed", "failed", "stopped"]
+              },
+              "worktree": { "type": ["string", "null"] },
+              "last_commit": { "type": ["string", "null"] },
+              "last_message_at": { "type": ["string", "null"], "format": "date-time" },
+              "assigned_issue": { "type": ["integer", "null"], "minimum": 1 },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "codex": {
       "type": "object",
       "properties": {

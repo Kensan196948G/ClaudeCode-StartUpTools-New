@@ -57,6 +57,26 @@
     "auto_issue_generation": true,
     "self_evolution": true
   },
+  "operation_mode": {
+    "_comment": "ClaudeOS v8.3+ 三層運用モデル。CLAUDE.md §3 / .claude/claudeos/system/conducted-mode.md 参照。",
+    "current": "cron_autonomous",
+    "_enum": "cron_autonomous | manual_subagent | conducted",
+    "conducted": {
+      "_comment": "公式 Agent Teams (experimental) + Agent View 併用時のみ有効。CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 必須。",
+      "enabled": false,
+      "lead_session_started_at": null,
+      "max_session_minutes": 240,
+      "graceful_shutdown_threshold_minutes": 30,
+      "spawn_token_threshold_pct": 70,
+      "spawn_freeze_remaining_minutes": 60
+    }
+  },
+  "agent_teams": {
+    "_comment": "conducted モード時に teammates の状態をミラーする。session-end.js が graceful shutdown 時に書き込む。",
+    "last_snapshot_at": null,
+    "active_team_id": null,
+    "teammates": []
+  },
   "improvement": {
     "stop_doing_review_date": null,
     "stop_doing_review_interval_days": 90,
