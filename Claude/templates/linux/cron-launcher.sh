@@ -31,6 +31,10 @@ PROJECTS_BASE="${PROJECTS_BASE:-$HOME/Projects}"
 PROJECT_DIR="$PROJECTS_BASE/$PROJECT"
 REPORT_SCRIPT="${CLAUDEOS_REPORT_SCRIPT:-$CLAUDEOS_HOME/report-and-mail.py}"
 
+# ClaudeOS goals/ の共通テンプレートパス（全プロジェクトから参照）
+CLAUDEOS_GOALS_DIR="${CLAUDEOS_GOALS_DIR:-$PROJECTS_BASE/ClaudeCode-StartUpTools-New/Claude/templates/claude/ClaudeOS/goals}"
+export CLAUDEOS_GOALS_DIR
+
 mkdir -p "$SESSIONS_DIR" "$LOGS_DIR"
 chmod 700 "$CLAUDEOS_HOME" "$SESSIONS_DIR" "$LOGS_DIR" 2>/dev/null || true
 
@@ -168,6 +172,7 @@ STATE_FILE="$PROJECT_DIR/state.json"
 RESUME_PHASE="Monitor"
 RESUME_CONSECUTIVE=0
 RESUME_SUMMARY=""
+RESUME_GOAL_TYPE="mvp-release"
 
 if [[ -f "$STATE_FILE" ]] && command -v python3 >/dev/null 2>&1; then
   RESUME_PHASE=$(python3 -c "
@@ -192,6 +197,14 @@ try:
     print(s[:300] if s else '(none)')
 except: print('(none)')
 " 2>/dev/null || echo "(none)")
+  RESUME_GOAL_TYPE=$(python3 -c "
+import json,sys
+try:
+    d=json.load(open('$STATE_FILE'))
+    print(d.get('goal_type','mvp-release'))
+except: print('mvp-release')
+" 2>/dev/null || echo "mvp-release")
+  export CLAUDEOS_GOAL_TYPE="$RESUME_GOAL_TYPE"
 
   # --- 保守モード分岐 ---
   # project.phase_mode が "maintenance" なら セッション時間・フェーズを保守用に切替
@@ -263,7 +276,7 @@ if [[ -f "$STATE_FILE" ]]; then
   if [[ "${PHASE_MODE:-development}" == "maintenance" ]]; then
     MAINT_NOTE=" [maintenance mode: max ${DURATION_MIN}min, loop=maintenance-loop.md, KPI=SLA/MTTR]"
   fi
-  RESUME_HEADER="[Cron Session Resume] phase=${RESUME_PHASE} phase_mode=${PHASE_MODE:-development}${MAINT_NOTE} consecutive_success=${RESUME_CONSECUTIVE} last_summary=${RESUME_SUMMARY}
+  RESUME_HEADER="[Cron Session Resume] phase=${RESUME_PHASE} phase_mode=${PHASE_MODE:-development}${MAINT_NOTE} goal_type=${RESUME_GOAL_TYPE} goals_dir=${CLAUDEOS_GOALS_DIR} consecutive_success=${RESUME_CONSECUTIVE} last_summary=${RESUME_SUMMARY}
 
 "
   PROMPT_ARG="${RESUME_HEADER}${PROMPT_ARG}"
