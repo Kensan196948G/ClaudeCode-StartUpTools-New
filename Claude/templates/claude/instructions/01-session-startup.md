@@ -24,7 +24,7 @@ ClaudeOS v9.0 起動時に、`/goal` 設定・前回状態・GitHub・CI・Proje
 ## 🎯 /goal 設定例
 
 ```bash
-/goal "Issue #XX-#YY を実装し、全テスト通過・CI成功・blocker=0・PR作成済み、または stop after 20 turns"
+/goal "MVP Release Candidate を完成させる。完了条件: 全主要画面正常動作・API疎通成功・認証認可正常・DB CRUD成功・CI成功・Critical/High脆弱性ゼロ・E2Eテスト成功・README/運用手順完成・Docker起動成功・ローカル環境再現可能。停止条件: MVP完成・CI成功・リリース条件達成・修復ループ上限到達"
 ```
 
 ---
