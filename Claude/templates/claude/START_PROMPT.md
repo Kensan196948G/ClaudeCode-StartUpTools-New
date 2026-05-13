@@ -123,7 +123,7 @@ MVP Release Candidate を完成させる。
 - 全主要機能動作
 - CI成功
 - Critical/High脆弱性ゼロ
-- Docker再現成功
+- Docker再現成功（docker-compose.yml がある場合のみ）
 - README完成
 - E2E成功
 
@@ -1831,7 +1831,7 @@ ClaudeCode は以下を達成すること。
 6. Critical/High脆弱性ゼロ
 7. E2Eテスト成功
 8. README/運用手順完成
-9. Docker起動成功
+9. Docker起動成功（docker-compose.yml がある場合のみ）
 10. ローカル環境で再現可能
 
 以下は今回対象外：
@@ -1871,7 +1871,7 @@ ClaudeCode は以下を達成すること。
 6. Critical/High脆弱性ゼロ
 7. E2Eテスト成功
 8. README/運用手順完成
-9. Docker起動成功
+9. Docker起動成功（docker-compose.yml がある場合のみ）
 10. ローカル環境で再現可能
 ```
 
@@ -1898,7 +1898,7 @@ gh run list --limit 5
 gh pr list --state open
 
 # 2. /goal 設定
-/goal "MVP Release Candidate を完成させる。完了条件: 全主要画面正常動作・API疎通成功・認証認可正常・DB CRUD成功・CI成功・Critical/High脆弱性ゼロ・E2Eテスト成功・README/運用手順完成・Docker起動成功・ローカル環境再現可能。停止条件: MVP完成・CI成功・リリース条件達成・修復ループ上限到達"
+/goal "MVP Release Candidate を完成させる。完了条件: 全主要画面正常動作・API疎通成功・認証認可正常・DB CRUD成功・CI成功・Critical/High脆弱性ゼロ・E2Eテスト成功・README/運用手順完成・Docker起動成功(docker-compose.ymlがある場合のみ)・ローカル環境再現可能。停止条件: MVP完成・CI成功・リリース条件達成・修復ループ上限到達"
 
 # 3. Agent View 起動
 claude agents
