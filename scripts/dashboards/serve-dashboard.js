@@ -713,17 +713,24 @@ function getAgentAndEventData() {
   // Git log as event stream
   try {
     const out = require('child_process').execSync(
-      'git log --oneline -15 --pretty=format:"%h|%s|%cr|%an"',
+      'git log --oneline -15 --pretty=format:"%h|%s|%ct|%an"',
       { cwd: PROJ_ROOT, timeout: 3000, encoding: 'utf8' }
     );
     out.split('\n').filter(Boolean).forEach(line => {
-      const [hash, subject, time, author] = line.split('|');
+      const [hash, subject, ctStr, author] = line.split('|');
       if (!hash || !subject) return;
+      // Convert UNIX timestamp to Japanese relative time
+      const diffSec = Math.floor(Date.now() / 1000) - parseInt(ctStr || '0', 10);
+      let timeJa;
+      if      (diffSec < 60)          timeJa = `${diffSec}秒前`;
+      else if (diffSec < 3600)        timeJa = `${Math.floor(diffSec / 60)}分前`;
+      else if (diffSec < 86400)       timeJa = `${Math.floor(diffSec / 3600)}時間前`;
+      else                            timeJa = `${Math.floor(diffSec / 86400)}日前`;
       const type = subject.startsWith('fix')   ? 'success'
                  : subject.startsWith('feat')  ? 'info'
                  : subject.startsWith('chore') ? 'phase'
                  : 'info';
-      eventLog.push({ time: time || '—', agent: author || 'Git', message: `[${hash}] ${subject}`, type });
+      eventLog.push({ time: timeJa, agent: author || 'Git', message: `[${hash}] ${subject}`, type });
     });
   } catch { /* git not available */ }
 
