@@ -395,7 +395,7 @@ window.Panel = Panel;
 function Tag({ children, color, bg }) {
   const c = color || MC.accent;
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, fontFamily:MC.mono, letterSpacing:"0.02em", color:c, background: bg || (c + "18"), border:`1px solid ${c}33` }}>{children}</span>
+    <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, fontFamily:MC.mono, letterSpacing:"0.02em", whiteSpace:"nowrap", color:c, background: bg || (c + "18"), border:`1px solid ${c}33` }}>{children}</span>
   );
 }
 window.Tag = Tag;
@@ -1616,6 +1616,7 @@ const LogPanel = ({ liveData }) => {
     if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [filtered.length, autoScroll]);
   const typeColors = { info:MC.textDim, success:MC.green, decision:MC.amber, phase:MC.accent, error:MC.red };
+  const typeLabels = { info:"情報", success:"成功", decision:"判断", phase:"フェーズ", error:"エラー" };
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
@@ -1642,7 +1643,7 @@ const LogPanel = ({ liveData }) => {
                   <td style={{ padding:"6px 12px", color:MC.textMuted, fontSize:10, whiteSpace:"nowrap" }}>{log.time}</td>
                   <td style={{ padding:"6px 12px", color:MC.text, fontSize:11 }}>{log.agent}</td>
                   <td style={{ padding:"6px 12px", color:typeColors[log.type]||MC.textDim, lineHeight:1.4 }}>{log.message}</td>
-                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{log.type}</Tag></td>
+                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{typeLabels[log.type]||log.type}</Tag></td>
                 </tr>
               ))}
             </tbody>
