@@ -14,7 +14,7 @@ const http    = require('http');
 const fs      = require('fs');
 const path    = require('path');
 const os      = require('os');
-const { exec }      = require('child_process');
+const { exec, execSync } = require('child_process');
 const { promisify } = require('util');
 const execAsync     = promisify(exec);
 
@@ -602,6 +602,82 @@ function getBootSteps() {
   ];
 }
 
+/** Find the most recently active (or currently running) Cron project */
+function getActiveCronProject() {
+  const now = new Date();
+  let bestEntry = null;
+  let bestDiff = Infinity;
+  try {
+    const raw = JSON.parse(fs.readFileSync(CRON_REG, 'utf8'));
+    const entries = Array.isArray(raw) ? raw : [];
+    for (const e of entries) {
+      const n = normalizeEntry(e);
+      const dows = Array.isArray(n.dayOfWeek) ? n.dayOfWeek : [];
+      const [h, m] = (n.time || '00:00').split(':').map(Number);
+      const duration = n.duration || 300;
+      // Search last 7 days for the most recent scheduled start
+      for (let daysBack = 0; daysBack <= 6; daysBack++) {
+        const candidate = new Date(now);
+        candidate.setDate(candidate.getDate() - daysBack);
+        candidate.setHours(h, m, 0, 0);
+        if (candidate > now) continue;
+        // registry: 1=Mon...6=Sat, 7=Sun
+        const jsDow = candidate.getDay();
+        const regDow = jsDow === 0 ? 7 : jsDow;
+        if (!dows.includes(regDow)) continue;
+        const diffMin = Math.floor((now - candidate) / 60000);
+        if (diffMin < bestDiff) {
+          bestDiff = diffMin;
+          const isRunning = diffMin < duration;
+          const pct = Math.min(100, Math.round(diffMin / duration * 100));
+          bestEntry = {
+            project:            n.project,
+            host:               n.linuxHost || '—',
+            scheduleTime:       n.time || '—',
+            duration,
+            isRunning,
+            sessionElapsedMin:  diffMin,
+            sessionProgressPct: pct,
+            lastStartedAt:      candidate.toISOString(),
+            nextRunDow:         dows,
+          };
+        }
+        break; // only most recent occurrence per entry
+      }
+    }
+  } catch {}
+  return bestEntry;
+}
+
+/** Active session / project info for Boot Sequence panel */
+function getCurrentProjectInfo() {
+  // Dev environment info (git)
+  const projectName = path.basename(PROJ_ROOT);
+  let branch = '—', todayCommits = 0, todayCommitList = [];
+  try {
+    branch = execSync('git branch --show-current', { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 3000 }).trim() || 'main';
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = execSync(`git log --after="${today} 00:00" --oneline`, { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 3000 }).trim();
+    todayCommitList = raw ? raw.split('\n').filter(Boolean) : [];
+    todayCommits = todayCommitList.length;
+  } catch {}
+  let goal = '—', phase = '—';
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(PROJ_ROOT, 'state.json'), 'utf8'));
+    goal  = st?.goal?.title || (typeof st?.goal === 'string' ? st.goal : null) || '—';
+    phase = st?.phase || '—';
+  } catch {}
+  // Active Cron project (most recently running)
+  const activeCron = getActiveCronProject();
+  return {
+    projectName, branch, todayCommits,
+    todayCommitList: todayCommitList.slice(0, 5),
+    goal, phase,
+    activeCron,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 /** Agent teams + event log from session files and git log */
 function getAgentAndEventData() {
   const agentTeams = [];
@@ -749,7 +825,9 @@ async function handleMcData(res) {
     // ── 4. Agent teams + event log ────────────────────────────────────────
     const { agentTeams, eventLog } = getAgentAndEventData();
 
+    const currentProjectInfo = getCurrentProjectInfo();
     const data = {
+      currentProjectInfo,
       cronSchedules,
       ciWorkflows:  ghData.ciWorkflows,
       recentPRs:    ghData.recentPRs,

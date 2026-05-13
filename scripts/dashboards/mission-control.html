@@ -1433,9 +1433,22 @@ window.CronPanel = CronPanel;
   <script type="text/babel">
 const BootPanel = ({ state, liveData }) => {
   const steps = (liveData?.bootSteps?.length ? liveData.bootSteps : null) || window.BOOT_STEPS;
+  const proj  = liveData?.currentProjectInfo || {};
   const [expandedStep, setExpandedStep] = React.useState(null);
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const completedCount = steps.filter(s => s.status === "completed").length;
-  const runningCount = steps.filter(s => s.status === "running").length;
+  const runningCount   = steps.filter(s => s.status === "running").length;
+  // リアルタイム経過時間（セッション開始から）
+  const sessionElapsedSec = (() => {
+    const ref = state?.sessionStartAt || null;
+    if (!ref) return null;
+    return Math.floor((now - new Date(ref).getTime()) / 1000);
+  })();
+  const fmtSec = s => s == null ? '—' : s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m${s%60}s` : `${Math.floor(s/3600)}h${Math.floor((s%3600)/60)}m`;
   const BootBadge = ({ status }) => {
     const map = { completed:{color:MC.green,label:"完了"}, running:{color:MC.amber,label:"実行中"}, pending:{color:MC.textMuted,label:"待機"} };
     const m = map[status] || map.pending;
@@ -1447,8 +1460,19 @@ const BootPanel = ({ state, liveData }) => {
         <Panel title="Boot Sequence 進捗" icon="🏁">
           <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:12 }}>
             <div style={{ flex:1 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}><span style={{ fontSize:11, color:MC.textDim }}>完了: {completedCount}/9 ステップ</span><span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>{Math.round((completedCount/9)*100)}%</span></div>
-              <div style={{ height:8, background:MC.border, borderRadius:4, overflow:"hidden" }}><div style={{ height:"100%", borderRadius:4, transition:"width 0.5s", width:`${(completedCount/9)*100}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} /></div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:11, color:MC.textDim }}>完了: {completedCount}/9 ステップ</span>
+                <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>{Math.round((completedCount/9)*100)}%</span>
+              </div>
+              <div style={{ height:8, background:MC.border, borderRadius:4, overflow:"hidden" }}>
+                <div style={{ height:"100%", borderRadius:4, transition:"width 0.5s", width:`${(completedCount/9)*100}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} />
+              </div>
+              {sessionElapsedSec != null && (
+                <div style={{ marginTop:6, fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>
+                  ⏱ セッション経過: <span style={{ color:MC.accent }}>{fmtSec(sessionElapsedSec)}</span>
+                  <span style={{ marginLeft:12, color:MC.textMuted }}>更新: {new Date(now).toLocaleTimeString('ja-JP')}</span>
+                </div>
+              )}
             </div>
             <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.green }}>{completedCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>完了</div></div>
             <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.amber }}>{runningCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>実行中</div></div>
@@ -1479,6 +1503,73 @@ const BootPanel = ({ state, liveData }) => {
         </Panel>
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {/* ── Active Cron Session Panel ── */}
+        <Panel title="アクティブCronセッション" icon="🚀">
+          {(() => {
+            const cron = proj.activeCron;
+            if (!cron) return <div style={{ color:MC.textMuted, fontSize:11 }}>Cronデータ取得中...</div>;
+            const elH = Math.floor(cron.sessionElapsedMin / 60);
+            const elM = cron.sessionElapsedMin % 60;
+            const elapsedStr = elH > 0 ? `${elH}h ${elM}m` : `${elM}m`;
+            const startLocal = cron.lastStartedAt ? new Date(cron.lastStartedAt).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
+                {/* プロジェクト名 */}
+                <div>
+                  <div style={{ fontSize:9, color:MC.textMuted, marginBottom:2 }}>📌 稼働中プロジェクト（Cron）</div>
+                  <div style={{ fontFamily:MC.mono, color: cron.isRunning ? MC.green : MC.accent, fontWeight:700, fontSize:12, wordBreak:"break-all" }}>
+                    {cron.project}
+                  </div>
+                  <div style={{ marginTop:3 }}>
+                    {cron.isRunning
+                      ? <Tag color={MC.green}>● 実行中</Tag>
+                      : <Tag color={MC.textMuted}>最近完了</Tag>}
+                  </div>
+                </div>
+                {/* セッション進捗バー */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:9, color:MC.textMuted }}>セッション進捗</span>
+                    <span style={{ fontSize:9, fontFamily:MC.mono, color: cron.isRunning ? MC.green : MC.textDim }}>
+                      {cron.sessionProgressPct}% ({elapsedStr} / {cron.duration}分)
+                    </span>
+                  </div>
+                  <div style={{ height:6, background:MC.border, borderRadius:3, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:3, width:`${Math.min(100,cron.sessionProgressPct)}%`, background: cron.isRunning ? `linear-gradient(90deg,${MC.accent},${MC.green})` : MC.textMuted }} />
+                  </div>
+                </div>
+                {/* ホスト・スケジュール */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6, display:"flex", flexDirection:"column", gap:4, fontSize:10 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>ホスト</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.cyan }}>{cron.host}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>開始時刻</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.text }}>{startLocal}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>スケジュール</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.accent }}>{cron.scheduleTime}</span>
+                  </div>
+                </div>
+                {/* リアルタイム時刻 */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>⏱ 現在時刻（リアルタイム）</div>
+                    <div style={{ fontFamily:MC.mono, color:MC.green, fontSize:16, fontWeight:700, marginTop:1 }}>
+                      {new Date(now).toLocaleTimeString('ja-JP')}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>フェーズ</div>
+                    <Tag color={MC.accent}>{proj.phase || "Development"}</Tag>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </Panel>
         <Panel title="Boot コマンド" icon="⌨️">
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {[["Start-ClaudeOS.ps1","9ステップ初期化"],["Start-ClaudeOS.ps1 -DryRun","非破壊プレビュー"],["Start-ClaudeOS.ps1 -NonInteractive","CI / 自動実行向け"]].map(c => (
