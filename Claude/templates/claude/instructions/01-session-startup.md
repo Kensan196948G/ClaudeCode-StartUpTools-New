@@ -40,7 +40,7 @@ MVP Release Candidate を完成させる。
 - 全主要機能動作
 - CI成功
 - Critical/High脆弱性ゼロ
-- Docker再現成功
+- Docker再現成功（docker-compose.yml がある場合のみ）
 - README完成
 - E2E成功
 
