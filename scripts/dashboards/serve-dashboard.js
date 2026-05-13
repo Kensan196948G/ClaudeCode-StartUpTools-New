@@ -10,14 +10,18 @@
 
 'use strict';
 
-const http = require('http');
-const fs   = require('fs');
-const path = require('path');
-const os   = require('os');
+const http    = require('http');
+const fs      = require('fs');
+const path    = require('path');
+const os      = require('os');
+const { exec, execSync } = require('child_process');
+const { promisify } = require('util');
+const execAsync     = promisify(exec);
 
 const PORT         = parseInt(process.argv.find(a => a.match(/^\d+$/)) || '3737', 10);
 const CRON_REG     = path.join(os.homedir(), '.claudeos', 'cron-registry.json');
 const SESSIONS_DIR = path.join(os.homedir(), '.claudeos', 'sessions');
+const PROJ_ROOT    = path.resolve(__dirname, '..', '..');
 
 // config.json / github-registry.json / linux-projects.json の候補パス
 const CONFIG_CANDIDATES = [
@@ -506,6 +510,234 @@ function buildHtml() {
 }
 
 // ---------------------------------------------------------------------------
+// GitHub + Session + Boot helpers (for /api/mc-data)
+// ---------------------------------------------------------------------------
+
+/** Convert ISO timestamp to relative Japanese string */
+function relTime(isoStr) {
+  if (!isoStr) return '—';
+  const ms = Date.now() - new Date(isoStr).getTime();
+  const m  = Math.floor(ms / 60000);
+  if (m < 1)  return 'たった今';
+  if (m < 60) return `${m}分前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}時間前`;
+  return `${Math.floor(h / 24)}日前`;
+}
+
+/** Elapsed string from ISO start time */
+function elapsedStr(isoStr) {
+  if (!isoStr) return '—';
+  const m = Math.floor((Date.now() - new Date(isoStr).getTime()) / 60000);
+  if (m < 60) return `${m}分`;
+  return `${Math.floor(m / 60)}h${m % 60}m`;
+}
+
+// Server-side cache for GitHub CLI data (TTL: 25s — slightly shorter than client 30s)
+let _ghCache   = null;
+let _ghCacheAt = 0;
+const GH_CACHE_TTL = 25000;
+
+async function fetchGhData() {
+  const now = Date.now();
+  if (_ghCache && now - _ghCacheAt < GH_CACHE_TTL) return _ghCache;
+
+  const opts = { timeout: 7000, cwd: PROJ_ROOT };
+  const [runRes, prRes, issueRes] = await Promise.allSettled([
+    execAsync('gh run list --limit 8 --json databaseId,workflowName,name,status,conclusion,headBranch,headSha,updatedAt', opts),
+    execAsync('gh pr list  --limit 8 --state all --json number,title,state,author,headRefName,createdAt,mergedAt', opts),
+    execAsync('gh issue list --limit 8 --json number,title,labels,assignees,createdAt', opts),
+  ]);
+
+  const ciWorkflows = runRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(runRes.value.stdout).map(r => ({
+        status:      r.conclusion || r.status || 'pending',
+        displayName: r.workflowName || r.name || '—',
+        branch:      r.headBranch  || 'main',
+        commit:      (r.headSha    || '').slice(0, 7),
+        duration:    '—',
+        time:        relTime(r.updatedAt),
+      })); } catch { return []; } })()
+    : [];
+
+  const recentPRs = prRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(prRes.value.stdout).map(p => ({
+        number: p.number,
+        title:  p.title,
+        branch: p.headRefName || '',
+        status: p.state === 'MERGED' ? 'merged' : p.state === 'CLOSED' ? 'closed' : 'open',
+        checks: 'passed',
+        time:   relTime(p.mergedAt || p.createdAt),
+      })); } catch { return []; } })()
+    : [];
+
+  const openIssues = issueRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(issueRes.value.stdout).map(i => ({
+        number:   i.number,
+        title:    i.title,
+        labels:   (i.labels || []).map(l => l.name).slice(0, 3),
+        assignee: (i.assignees || []).map(a => a.login).join(', ') || '未割り当て',
+        time:     relTime(i.createdAt),
+      })); } catch { return []; } })()
+    : [];
+
+  _ghCache   = { ciWorkflows, recentPRs, openIssues };
+  _ghCacheAt = now;
+  return _ghCache;
+}
+
+/** 9-step boot status from actual file existence checks */
+function getBootSteps() {
+  function chk(rel) { try { return fs.existsSync(path.join(PROJ_ROOT, rel)); } catch { return false; } }
+  return [
+    { step:1, name:'状態確認',      nameEn:'State Load',     detail:'state.json 読み込み・KPI確認',          status: chk('state.json')         ? 'completed':'pending', duration:'—' },
+    { step:2, name:'Review Tools',  nameEn:'Review Diag',    detail:'.coderabbit.yaml / .codex 診断',        status: chk('.coderabbit.yaml')   ? 'completed':'pending', duration:'—' },
+    { step:3, name:'Codex Setup',   nameEn:'Codex',          detail:'Codex 認証・設定確認',                   status: chk('.codex')             ? 'completed':'pending', duration:'—' },
+    { step:4, name:'/goal 設定',    nameEn:'Goal Set',       detail:'/goal コマンドで達成条件を設定',          status: chk('state.json')         ? 'completed':'pending', duration:'—' },
+    { step:5, name:'Memory 復元',   nameEn:'Memory Restore', detail:'Memory MCP 前セッション引継ぎ',           status: 'completed',                                      duration:'—' },
+    { step:6, name:'Issue 確認',    nameEn:'Issue Check',    detail:'gh issue list で優先課題を確認',          status: 'completed',                                      duration:'—' },
+    { step:7, name:'CI 確認',       nameEn:'CI Check',       detail:'gh run list で CI 状態を確認',            status: chk('.github/workflows')  ? 'completed':'pending', duration:'—' },
+    { step:8, name:'Agent Teams',   nameEn:'Agent Start',    detail:'状況に応じてパターン A/B/C を spawn',     status: 'completed',                                      duration:'—' },
+    { step:9, name:'Monitor 開始',  nameEn:'Monitor Start',  detail:'Monitor → Build → Verify ループ開始',    status: 'completed',                                      duration:'—' },
+  ];
+}
+
+/** Find the most recently active (or currently running) Cron project */
+function getActiveCronProject() {
+  const now = new Date();
+  let bestEntry = null;
+  let bestDiff = Infinity;
+  try {
+    const raw = JSON.parse(fs.readFileSync(CRON_REG, 'utf8'));
+    const entries = Array.isArray(raw) ? raw : [];
+    for (const e of entries) {
+      const n = normalizeEntry(e);
+      const dows = Array.isArray(n.dayOfWeek) ? n.dayOfWeek : [];
+      const [h, m] = (n.time || '00:00').split(':').map(Number);
+      const duration = n.duration || 300;
+      // Search last 7 days for the most recent scheduled start
+      for (let daysBack = 0; daysBack <= 6; daysBack++) {
+        const candidate = new Date(now);
+        candidate.setDate(candidate.getDate() - daysBack);
+        candidate.setHours(h, m, 0, 0);
+        if (candidate > now) continue;
+        // registry: 1=Mon...6=Sat, 7=Sun
+        const jsDow = candidate.getDay();
+        const regDow = jsDow === 0 ? 7 : jsDow;
+        if (!dows.includes(regDow)) continue;
+        const diffMin = Math.floor((now - candidate) / 60000);
+        if (diffMin < bestDiff) {
+          bestDiff = diffMin;
+          const isRunning = diffMin < duration;
+          const pct = Math.min(100, Math.round(diffMin / duration * 100));
+          bestEntry = {
+            project:            n.project,
+            host:               n.linuxHost || '—',
+            scheduleTime:       n.time || '—',
+            duration,
+            isRunning,
+            sessionElapsedMin:  diffMin,
+            sessionProgressPct: pct,
+            lastStartedAt:      candidate.toISOString(),
+            nextRunDow:         dows,
+          };
+        }
+        break; // only most recent occurrence per entry
+      }
+    }
+  } catch {}
+  return bestEntry;
+}
+
+/** Active session / project info for Boot Sequence panel */
+function getCurrentProjectInfo() {
+  // Dev environment info (git)
+  const projectName = path.basename(PROJ_ROOT);
+  let branch = '—', todayCommits = 0, todayCommitList = [];
+  try {
+    branch = execSync('git branch --show-current', { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 3000 }).trim() || 'main';
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = execSync(`git log --after="${today} 00:00" --oneline`, { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 3000 }).trim();
+    todayCommitList = raw ? raw.split('\n').filter(Boolean) : [];
+    todayCommits = todayCommitList.length;
+  } catch {}
+  let goal = '—', phase = '—';
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(PROJ_ROOT, 'state.json'), 'utf8'));
+    goal  = st?.goal?.title || (typeof st?.goal === 'string' ? st.goal : null) || '—';
+    phase = st?.phase || '—';
+  } catch {}
+  // Active Cron project (most recently running)
+  const activeCron = getActiveCronProject();
+  return {
+    projectName, branch, todayCommits,
+    todayCommitList: todayCommitList.slice(0, 5),
+    goal, phase,
+    activeCron,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+/** Agent teams + event log from session files and git log */
+function getAgentAndEventData() {
+  const agentTeams = [];
+  const eventLog   = [];
+
+  if (fs.existsSync(SESSIONS_DIR)) {
+    try {
+      fs.readdirSync(SESSIONS_DIR)
+        .filter(f => f.endsWith('.json'))
+        .sort().reverse()
+        .slice(0, 6)
+        .forEach((file, idx) => {
+          try {
+            const s = JSON.parse(fs.readFileSync(path.join(SESSIONS_DIR, file), 'utf8'));
+            agentTeams.push({
+              id:         `sess-${idx}`,
+              role:       s.agent_role  || 'CTO',
+              icon:       s.agent_icon  || '👔',
+              status:     s.status === 'running' ? 'working' : s.status === 'completed' ? 'completed' : 'idle',
+              task:       s.current_task || s.goal || '—',
+              model:      'claude-sonnet-4-6',
+              tokens:     s.token_count  || 0,
+              elapsed:    elapsedStr(s.start_time),
+              domain:     s.project      || '—',
+              lastAction: s.current_task || '—',
+              time:       relTime(s.start_time),
+            });
+          } catch { /* skip unreadable session */ }
+        });
+    } catch { /* SESSIONS_DIR not readable */ }
+  }
+
+  // Git log as event stream
+  try {
+    const out = require('child_process').execSync(
+      'git log --oneline -15 --pretty=format:"%h|%s|%ct|%an"',
+      { cwd: PROJ_ROOT, timeout: 3000, encoding: 'utf8' }
+    );
+    out.split('\n').filter(Boolean).forEach(line => {
+      const [hash, subject, ctStr, author] = line.split('|');
+      if (!hash || !subject) return;
+      // Convert UNIX timestamp to Japanese relative time
+      const diffSec = Math.floor(Date.now() / 1000) - parseInt(ctStr || '0', 10);
+      let timeJa;
+      if      (diffSec < 60)          timeJa = `${diffSec}秒前`;
+      else if (diffSec < 3600)        timeJa = `${Math.floor(diffSec / 60)}分前`;
+      else if (diffSec < 86400)       timeJa = `${Math.floor(diffSec / 3600)}時間前`;
+      else                            timeJa = `${Math.floor(diffSec / 86400)}日前`;
+      const type = subject.startsWith('fix')   ? 'success'
+                 : subject.startsWith('feat')  ? 'info'
+                 : subject.startsWith('chore') ? 'phase'
+                 : 'info';
+      eventLog.push({ time: timeJa, agent: author || 'Git', message: `[${hash}] ${subject}`, type });
+    });
+  } catch { /* git not available */ }
+
+  return { agentTeams, eventLog };
+}
+
+// ---------------------------------------------------------------------------
 // HTTP server
 // ---------------------------------------------------------------------------
 function handleApiData(res) {
@@ -556,15 +788,15 @@ function computeCronNextRun(scheduleExpr) {
   return null;
 }
 
-function handleMcData(res) {
+async function handleMcData(res) {
   try {
+    // ── 1. Cron schedules (sync) ──────────────────────────────────────────
     const cronReg = fs.existsSync(CRON_REG)
       ? JSON.parse(fs.readFileSync(CRON_REG, 'utf8'))
       : [];
 
     const cronSchedules = (Array.isArray(cronReg) ? cronReg : []).map(e => {
       const n = normalizeEntry(e);
-      // Build cron expression from time + dayOfWeek
       let scheduleExpr = '0 9 * * 1-6';
       if (n.time) {
         const [hh, mm] = n.time.split(':');
@@ -575,18 +807,15 @@ function handleMcData(res) {
           : '1-6';
         scheduleExpr = `${min} ${hour} * * ${dowPart}`;
       }
-
-      // Compute next run
       const nextDate = computeCronNextRun(scheduleExpr);
-      const nextRun = nextDate
+      const nextRun  = nextDate
         ? `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')} ${String(nextDate.getHours()).padStart(2,'0')}:${String(nextDate.getMinutes()).padStart(2,'0')}`
         : '—';
-
       return {
         project:  n.project,
         host:     n.linuxHost || LINUX_HOST,
         schedule: scheduleExpr,
-        duration: n.duration || 300,
+        duration: n.duration  || 300,
         status:   'active',
         lastRun:  n.created ? n.created.split('T')[0] : '—',
         nextRun,
@@ -594,7 +823,27 @@ function handleMcData(res) {
       };
     });
 
-    const data = { cronSchedules, generated: new Date().toISOString() };
+    // ── 2. GitHub data (async, cached 25s) ───────────────────────────────
+    const ghData = await fetchGhData();
+
+    // ── 3. Boot steps (file-existence check) ─────────────────────────────
+    const bootSteps = getBootSteps();
+
+    // ── 4. Agent teams + event log ────────────────────────────────────────
+    const { agentTeams, eventLog } = getAgentAndEventData();
+
+    const currentProjectInfo = getCurrentProjectInfo();
+    const data = {
+      currentProjectInfo,
+      cronSchedules,
+      ciWorkflows:  ghData.ciWorkflows,
+      recentPRs:    ghData.recentPRs,
+      openIssues:   ghData.openIssues,
+      bootSteps,
+      agentTeams,
+      eventLog,
+      generated: new Date().toISOString(),
+    };
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
     res.end(JSON.stringify(data, null, 2));
   } catch (e) {
@@ -636,7 +885,7 @@ if (require.main === module) {
       res.writeHead(403); res.end('Forbidden'); return;
     }
     if (req.url === '/api/data')           return handleApiData(res);
-    if (req.url === '/api/mc-data')        return handleMcData(res);
+    if (req.url === '/api/mc-data')        { handleMcData(res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} }); return; }
     if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());

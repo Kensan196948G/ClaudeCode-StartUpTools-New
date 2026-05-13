@@ -94,6 +94,7 @@
 85. [DONE] [Priority:P1][Owner:Developer][Source:Manual] v3.2.75 P1-2 state.json 自動生成(New-CronSchedule) + P1-4 セッション状態復元(cron-launcher.sh) + P1-5 session-start.js 書き込み昇格 + P2-2 _header.md Codex optional + P2-4 README タイムライン図 + P2-1 テスト具体化
 86. [DONE] [Priority:P2][Owner:Architect][Source:Manual] v3.2.76 P1-3 登録プロジェクトレジストリ集中管理 — CronManager.psm1 に Get/Add/Remove-LocalCronRegistryEntry 追加。~/.claudeos/cron-registry.json を cron 登録/削除時に自動更新。ユニットテスト 6件 (776 PASS)
 87. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.2.76 P1-7 Agent Teams 使用実績を state.json に記録 — usage-tracker.js 新規作成 / settings.json PostToolUse[Agent] hook 登録。learning.usage_history.agents に agentKey / call_count / last_used を記録 (776 PASS)
+88. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.1 Mission Control ダッシュボード全面改善 — Cron管理週間スケジュール全幅レイアウト / 正式名称2行表示 / Boot Sequenceアクティブセッションパネル / イベントログ日本語化 / /goal MVP RC テンプレート刷新 (PR #このブランチ)
 
 ## Auto Extracted From Agent Teams Matrix
 

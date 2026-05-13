@@ -277,14 +277,7 @@ const EVENT_LOG = [
 
 Object.assign(window, { MOCK_STATE, AGENTS_DATA, CI_WORKFLOWS, RECENT_PRS, OPEN_ISSUES, CRON_SCHEDULES, BOOT_STEPS, PHASE_TIMELINE, EVENT_LOG });
 
-// 実データフェッチ（サーバーが /api/mc-data を提供している場合）
-fetch('/api/mc-data').then(r => r.json()).then(data => {
-  if (data.state) Object.assign(window.MOCK_STATE, data.state);
-  if (data.cronSchedules) window.CRON_SCHEDULES = data.cronSchedules;
-  if (data.workflows) window.CI_WORKFLOWS = data.workflows;
-  if (data.prs) window.RECENT_PRS = data.prs;
-  if (data.issues) window.OPEN_ISSUES = data.issues;
-}).catch(() => { /* モックデータで継続 */ });
+// /api/mc-data のポーリングは App コンポーネントが一元管理する（30秒ごと）
   </script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -402,12 +395,12 @@ window.Panel = Panel;
 function Tag({ children, color, bg }) {
   const c = color || MC.accent;
   return (
-    <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, fontFamily:MC.mono, letterSpacing:"0.02em", color:c, background: bg || (c + "18"), border:`1px solid ${c}33` }}>{children}</span>
+    <span style={{ display:"inline-flex", alignItems:"center", padding:"2px 8px", borderRadius:4, fontSize:10, fontWeight:600, fontFamily:MC.mono, letterSpacing:"0.02em", whiteSpace:"nowrap", color:c, background: bg || (c + "18"), border:`1px solid ${c}33` }}>{children}</span>
   );
 }
 window.Tag = Tag;
 
-function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark }) {
+function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark, lastUpdated }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => { setNow(new Date()); setSessionElapsed(prev => prev + 1/60); }, 1000);
@@ -418,6 +411,9 @@ function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDa
   const remainM = Math.floor(remaining % 60);
   const remainS = Math.floor((remaining % 1) * 60);
   const pctElapsed = sessionElapsed / state.execution.max_duration_minutes;
+  const updStr = lastUpdated
+    ? lastUpdated.toLocaleTimeString("ja-JP", { hour:"2-digit", minute:"2-digit", second:"2-digit" })
+    : "—";
   return (
     <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 20px", height:48, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, flexShrink:0, gap:16 }}>
       <div style={{ display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
@@ -445,6 +441,11 @@ function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDa
         </div>
         <div style={{ fontSize:11, fontFamily:MC.mono, color:MC.textDim }}>
           Phase: <span style={{ color:"#00d4aa" }}>{state.execution.phase}</span>
+        </div>
+        {/* 最終データ更新時刻 */}
+        <div style={{ fontSize:9, fontFamily:MC.mono, color:MC.textMuted, display:"flex", alignItems:"center", gap:3 }}>
+          <span style={{ color: lastUpdated ? MC.green : MC.textMuted }}>●</span>
+          <span>{updStr}</span>
         </div>
         <button onClick={onToggleDark} title={darkMode ? "ライトモード" : "ダークモード"}
           style={{ width:34, height:34, borderRadius:8, border:`1px solid ${MC.border}`, background:MC.bgCard, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", fontSize:16, color:MC.text }}
@@ -884,10 +885,11 @@ window.DashboardPanel = DashboardPanel;
        BLOCK 5: Agent Teams Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const AgentsPanel = ({ state }) => {
+const AgentsPanel = ({ state, liveData }) => {
   const [selectedAgent, setSelectedAgent] = React.useState(null);
   const [teamPattern, setTeamPattern] = React.useState("A");
-  const agents = window.AGENTS_DATA;
+  // liveData.agentTeams があれば実データを優先、なければモック
+  const agents = (liveData?.agentTeams?.length ? liveData.agentTeams : null) || window.AGENTS_DATA;
   const statusCounts = { working:0, idle:0, completed:0 };
   agents.forEach(a => { statusCounts[a.status] = (statusCounts[a.status] || 0) + 1; });
   return (
@@ -987,11 +989,12 @@ window.AgentsPanel = AgentsPanel;
        BLOCK 6: CI/CD & GitHub Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const CICDPanel = () => {
+const CICDPanel = ({ liveData }) => {
   const [tab, setTab] = React.useState("workflows");
-  const workflows = window.CI_WORKFLOWS;
-  const prs = window.RECENT_PRS;
-  const issues = window.OPEN_ISSUES;
+  // liveData があれば実データを優先
+  const workflows = (liveData?.ciWorkflows?.length ? liveData.ciWorkflows : null) || window.CI_WORKFLOWS;
+  const prs       = (liveData?.recentPRs?.length   ? liveData.recentPRs   : null) || window.RECENT_PRS;
+  const issues    = (liveData?.openIssues?.length   ? liveData.openIssues  : null) || window.OPEN_ISSUES;
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:12, height:"100%" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
@@ -1169,19 +1172,16 @@ function formatNextRunDisplay(nextRunStr, expr) {
   return "—";
 }
 
-const CronPanel = () => {
+const CronPanel = ({ liveData }) => {
   const [schedules, setSchedules] = React.useState(window.CRON_SCHEDULES);
   const [showAdd, setShowAdd] = React.useState(false);
 
-  // Sync with window.CRON_SCHEDULES after async fetch completes
+  // liveData.cronSchedules が更新されたら即座に同期（30秒ポーリング連動）
   React.useEffect(() => {
-    const tid = setTimeout(() => {
-      if (window.CRON_SCHEDULES && window.CRON_SCHEDULES !== schedules) {
-        setSchedules([...window.CRON_SCHEDULES]);
-      }
-    }, 1500);
-    return () => clearTimeout(tid);
-  }, []);
+    if (liveData?.cronSchedules?.length) {
+      setSchedules([...liveData.cronSchedules]);
+    }
+  }, [liveData?.cronSchedules]);
 
   const togglePause = (idx) => setSchedules(prev =>
     prev.map((s,i) => i===idx ? {...s, status: s.status==="active" ? "paused" : "active"} : s)
@@ -1200,8 +1200,10 @@ const CronPanel = () => {
   }, [parsedSchedules]);
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:12, height:"100%" }}>
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
+      {/* ── Top row: Schedule table + Right sidebar ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:12, minWidth:0 }}>
+        <div style={{ minWidth:0 }}>
 
         {/* ── Schedule table ── */}
         <Panel title="Cronスケジュール一覧" icon="🕐" headerRight={
@@ -1261,15 +1263,84 @@ const CronPanel = () => {
           </table>
         </Panel>
 
-        {/* ── Weekly calendar (dynamic hours) ── */}
-        <Panel title="週間スケジュール" icon="📅">
-          {calHours.length === 0 ? (
-            <div style={{ textAlign:"center", color:MC.textMuted, fontSize:12, padding:24 }}>
-              データ読み込み中...
+        </div>{/* end left col */}
+
+        {/* ── Right sidebar ── */}
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <Panel title="登録サマリー" icon="📊">
+            <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>総登録数</span>
+                <span style={{ fontFamily:MC.mono, color:MC.text, fontWeight:700 }}>{schedules.length}件</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>稼働中</span>
+                <span style={{ fontFamily:MC.mono, color:MC.green, fontWeight:700 }}>{schedules.filter(s=>s.status==="active").length}件</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>停止中</span>
+                <span style={{ fontFamily:MC.mono, color:MC.amber }}>{schedules.filter(s=>s.status==="paused").length}件</span>
+              </div>
+              <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, display:"flex", flexDirection:"column", gap:5 }}>
+                {schedules.filter(s=>s.status==="active").map((s,i) => (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color:MC.textDim, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>
+                      {s.project.replace(/-[A-Z]/g, m => m.toLowerCase()).split("-").slice(0,2).join("-")}
+                    </span>
+                    <span style={{ fontFamily:MC.mono, color:MC.accent, fontSize:11, flexShrink:0 }}>
+                      {formatNextRunDisplay(s.nextRun, s.schedule)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div style={{ overflowX:"auto" }}>
-              <div style={{ display:"grid", gridTemplateColumns:`52px repeat(7, minmax(72px,1fr))`, gap:2, minWidth:560 }}>
+          </Panel>
+
+          <Panel title="Cron設定" icon="⚙️">
+            <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:12 }}>
+              {[
+                ["実行時間","300分 (5h)",false],
+                ["Launcher","/home/kensan/.claudeos/cron-launcher.sh",true],
+                ["Sessions","/home/kensan/.claudeos/sessions",true],
+                ["Logs","/home/kensan/.claudeos/logs",true],
+                ["Prefix","CLAUDEOS",false],
+              ].map(([l,v,mono]) => (
+                <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
+                  <span style={{ color:MC.textMuted, flexShrink:0, fontSize:11 }}>{l}</span>
+                  <span style={{ fontFamily: mono ? MC.mono : MC.sans, color:MC.text, fontWeight:500, fontSize: mono ? 10 : 12, textAlign:"right", wordBreak:"break-all" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          {showAdd && (
+            <Panel title="新規スケジュール登録" icon="➕">
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {[["プロジェクト","project-name"],["ホスト","linux-dev-01"],["cron式","0 9 * * 1-6"],["実行時間(分)","300"]].map(([l,p]) => (
+                  <div key={l}>
+                    <div style={{ fontSize:11, color:MC.textMuted, marginBottom:4 }}>{l}</div>
+                    <input placeholder={p} style={{ width:"100%", padding:"6px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background:MC.bgCard, color:MC.text, fontSize:11, fontFamily:MC.mono, outline:"none", boxSizing:"border-box" }}
+                      onFocus={e => e.target.style.borderColor = MC.accent}
+                      onBlur={e => e.target.style.borderColor = MC.border} />
+                  </div>
+                ))}
+                <button style={{ padding:8, borderRadius:4, border:"none", background:MC.accent, color:MC.bg, fontSize:12, fontWeight:700, cursor:"pointer" }}
+                  onClick={() => setShowAdd(false)}>登録</button>
+              </div>
+            </Panel>
+          )}
+        </div>{/* end right sidebar */}
+      </div>{/* end top row grid */}
+
+      {/* ── Bottom row: Full-width weekly calendar ── */}
+      <Panel title="週間スケジュール" icon="📅">
+        {calHours.length === 0 ? (
+          <div style={{ textAlign:"center", color:MC.textMuted, fontSize:12, padding:24 }}>
+            データ読み込み中...
+          </div>
+        ) : (
+          <div style={{ overflowX:"auto" }}>
+            <div style={{ display:"grid", gridTemplateColumns:`52px repeat(7, minmax(80px,1fr))`, gap:2, minWidth:560 }}>
                 {/* Header row */}
                 <div></div>
                 {DOW_JP.map((d,i) => (
@@ -1299,27 +1370,43 @@ const CronPanel = () => {
                       const bc = hits.length === 0 ? MC.border
                                : isActive  ? MC.accent+"70"
                                : MC.border;
-                      const label = hits.length > 1
-                        ? `${hits.length}件`
-                        : hits.length === 1
-                          ? hits[0].project.split("-")[0].substring(0,7)
-                          : "";
+                      // ハイフン中間点で2行分割
+                      const [calLine1, calLine2] = (() => {
+                        if (hits.length !== 1) return [hits.length > 1 ? `${hits.length}件` : "", ""];
+                        const name = hits[0].project;
+                        const parts = name.split('-');
+                        if (parts.length < 2) return [name, ""];
+                        const mid = Math.floor(name.length / 2);
+                        let bestIdx = 1, bestDist = Infinity, cumLen = parts[0].length;
+                        for (let i = 1; i < parts.length; i++) {
+                          const dist = Math.abs(cumLen - mid);
+                          if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+                          cumLen += 1 + parts[i].length;
+                        }
+                        return [parts.slice(0, bestIdx).join('-'), parts.slice(bestIdx).join('-')];
+                      })();
                       return (
                         <div key={day}
                           title={hits.map(s => `${s.project} (${formatScheduleDisplay(s.schedule)})`).join("\n")}
                           style={{
-                            height:34, borderRadius:4,
+                            minHeight:34, height:"auto", borderRadius:4,
+                            padding:"4px 3px",
                             background:bg, border:`1px solid ${bc}`,
                             display:"flex", flexDirection:"column",
                             alignItems:"center", justifyContent:"center",
-                            gap:1, cursor: hits.length > 0 ? "help" : "default",
+                            gap:0, cursor: hits.length > 0 ? "help" : "default",
                             transition:"all 0.15s",
                           }}>
                           {hits.length > 0 && (
                             <>
-                              <span style={{ fontSize:9, fontWeight:700, fontFamily:MC.mono, color: isActive ? MC.accent : MC.textMuted, lineHeight:1 }}>
-                                {label}
+                              <span style={{ fontSize:9, fontWeight:700, fontFamily:MC.mono, color: isActive ? MC.accent : MC.textMuted, lineHeight:1.35, textAlign:"center", whiteSpace:"normal", overflowWrap:"anywhere", width:"100%" }}>
+                                {calLine1}
                               </span>
+                              {calLine2 && (
+                                <span style={{ fontSize:9, fontWeight:600, fontFamily:MC.mono, color: isActive ? MC.accent+"cc" : MC.textDim, lineHeight:1.35, textAlign:"center", whiteSpace:"normal", overflowWrap:"anywhere", width:"100%" }}>
+                                  {calLine2}
+                                </span>
+                              )}
                               {isPaused && (
                                 <span style={{ fontSize:8, color:MC.amber }}>⏸</span>
                               )}
@@ -1334,73 +1421,6 @@ const CronPanel = () => {
             </div>
           )}
         </Panel>
-      </div>
-
-      {/* ── Right sidebar ── */}
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <Panel title="登録サマリー" icon="📊">
-          <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>総登録数</span>
-              <span style={{ fontFamily:MC.mono, color:MC.text, fontWeight:700 }}>{schedules.length}件</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>稼働中</span>
-              <span style={{ fontFamily:MC.mono, color:MC.green, fontWeight:700 }}>{schedules.filter(s=>s.status==="active").length}件</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>停止中</span>
-              <span style={{ fontFamily:MC.mono, color:MC.amber }}>{schedules.filter(s=>s.status==="paused").length}件</span>
-            </div>
-            <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, display:"flex", flexDirection:"column", gap:5 }}>
-              {schedules.filter(s=>s.status==="active").map((s,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ color:MC.textDim, fontSize:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>
-                    {s.project.replace(/-[A-Z]/g, m => m.toLowerCase()).split("-").slice(0,2).join("-")}
-                  </span>
-                  <span style={{ fontFamily:MC.mono, color:MC.accent, fontSize:10, flexShrink:0 }}>
-                    {formatNextRunDisplay(s.nextRun, s.schedule)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Cron設定" icon="⚙️">
-          <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
-            {[
-              ["実行時間","300分 (5h)",false],
-              ["Launcher","/home/kensan/.claudeos/cron-launcher.sh",true],
-              ["Sessions","/home/kensan/.claudeos/sessions",true],
-              ["Logs","/home/kensan/.claudeos/logs",true],
-              ["Prefix","CLAUDEOS",false],
-            ].map(([l,v,mono]) => (
-              <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
-                <span style={{ color:MC.textMuted, flexShrink:0, fontSize:10 }}>{l}</span>
-                <span style={{ fontFamily: mono ? MC.mono : MC.sans, color:MC.text, fontWeight:500, fontSize: mono ? 9 : 11, textAlign:"right", wordBreak:"break-all" }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        {showAdd && (
-          <Panel title="新規スケジュール登録" icon="➕">
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {[["プロジェクト","project-name"],["ホスト","linux-dev-01"],["cron式","0 9 * * 1-6"],["実行時間(分)","300"]].map(([l,p]) => (
-                <div key={l}>
-                  <div style={{ fontSize:10, color:MC.textMuted, marginBottom:4 }}>{l}</div>
-                  <input placeholder={p} style={{ width:"100%", padding:"6px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background:MC.bgCard, color:MC.text, fontSize:11, fontFamily:MC.mono, outline:"none", boxSizing:"border-box" }}
-                    onFocus={e => e.target.style.borderColor = MC.accent}
-                    onBlur={e => e.target.style.borderColor = MC.border} />
-                </div>
-              ))}
-              <button style={{ padding:8, borderRadius:4, border:"none", background:MC.accent, color:MC.bg, fontSize:12, fontWeight:700, cursor:"pointer" }}
-                onClick={() => setShowAdd(false)}>登録</button>
-            </div>
-          </Panel>
-        )}
-      </div>
     </div>
   );
 };
@@ -1411,11 +1431,24 @@ window.CronPanel = CronPanel;
        BLOCK 8: Boot Sequence Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const BootPanel = ({ state }) => {
-  const steps = window.BOOT_STEPS;
+const BootPanel = ({ state, liveData }) => {
+  const steps = (liveData?.bootSteps?.length ? liveData.bootSteps : null) || window.BOOT_STEPS;
+  const proj  = liveData?.currentProjectInfo || {};
   const [expandedStep, setExpandedStep] = React.useState(null);
+  const [now, setNow] = React.useState(Date.now());
+  React.useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const completedCount = steps.filter(s => s.status === "completed").length;
-  const runningCount = steps.filter(s => s.status === "running").length;
+  const runningCount   = steps.filter(s => s.status === "running").length;
+  // リアルタイム経過時間（セッション開始から）
+  const sessionElapsedSec = (() => {
+    const ref = state?.sessionStartAt || null;
+    if (!ref) return null;
+    return Math.floor((now - new Date(ref).getTime()) / 1000);
+  })();
+  const fmtSec = s => s == null ? '—' : s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m${s%60}s` : `${Math.floor(s/3600)}h${Math.floor((s%3600)/60)}m`;
   const BootBadge = ({ status }) => {
     const map = { completed:{color:MC.green,label:"完了"}, running:{color:MC.amber,label:"実行中"}, pending:{color:MC.textMuted,label:"待機"} };
     const m = map[status] || map.pending;
@@ -1427,8 +1460,19 @@ const BootPanel = ({ state }) => {
         <Panel title="Boot Sequence 進捗" icon="🏁">
           <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:12 }}>
             <div style={{ flex:1 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}><span style={{ fontSize:11, color:MC.textDim }}>完了: {completedCount}/9 ステップ</span><span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>{Math.round((completedCount/9)*100)}%</span></div>
-              <div style={{ height:8, background:MC.border, borderRadius:4, overflow:"hidden" }}><div style={{ height:"100%", borderRadius:4, transition:"width 0.5s", width:`${(completedCount/9)*100}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} /></div>
+              <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                <span style={{ fontSize:11, color:MC.textDim }}>完了: {completedCount}/9 ステップ</span>
+                <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>{Math.round((completedCount/9)*100)}%</span>
+              </div>
+              <div style={{ height:8, background:MC.border, borderRadius:4, overflow:"hidden" }}>
+                <div style={{ height:"100%", borderRadius:4, transition:"width 0.5s", width:`${(completedCount/9)*100}%`, background:`linear-gradient(90deg, ${MC.accent}, ${MC.green})` }} />
+              </div>
+              {sessionElapsedSec != null && (
+                <div style={{ marginTop:6, fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>
+                  ⏱ セッション経過: <span style={{ color:MC.accent }}>{fmtSec(sessionElapsedSec)}</span>
+                  <span style={{ marginLeft:12, color:MC.textMuted }}>更新: {new Date(now).toLocaleTimeString('ja-JP')}</span>
+                </div>
+              )}
             </div>
             <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.green }}>{completedCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>完了</div></div>
             <div style={{ textAlign:"center" }}><div style={{ fontSize:28, fontWeight:800, fontFamily:MC.mono, color:MC.amber }}>{runningCount}</div><div style={{ fontSize:9, color:MC.textMuted }}>実行中</div></div>
@@ -1459,6 +1503,73 @@ const BootPanel = ({ state }) => {
         </Panel>
       </div>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        {/* ── Active Cron Session Panel ── */}
+        <Panel title="アクティブCronセッション" icon="🚀">
+          {(() => {
+            const cron = proj.activeCron;
+            if (!cron) return <div style={{ color:MC.textMuted, fontSize:11 }}>Cronデータ取得中...</div>;
+            const elH = Math.floor(cron.sessionElapsedMin / 60);
+            const elM = cron.sessionElapsedMin % 60;
+            const elapsedStr = elH > 0 ? `${elH}h ${elM}m` : `${elM}m`;
+            const startLocal = cron.lastStartedAt ? new Date(cron.lastStartedAt).toLocaleString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
+                {/* プロジェクト名 */}
+                <div>
+                  <div style={{ fontSize:9, color:MC.textMuted, marginBottom:2 }}>📌 稼働中プロジェクト（Cron）</div>
+                  <div style={{ fontFamily:MC.mono, color: cron.isRunning ? MC.green : MC.accent, fontWeight:700, fontSize:12, wordBreak:"break-all" }}>
+                    {cron.project}
+                  </div>
+                  <div style={{ marginTop:3 }}>
+                    {cron.isRunning
+                      ? <Tag color={MC.green}>● 実行中</Tag>
+                      : <Tag color={MC.textMuted}>最近完了</Tag>}
+                  </div>
+                </div>
+                {/* セッション進捗バー */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:9, color:MC.textMuted }}>セッション進捗</span>
+                    <span style={{ fontSize:9, fontFamily:MC.mono, color: cron.isRunning ? MC.green : MC.textDim }}>
+                      {cron.sessionProgressPct}% ({elapsedStr} / {cron.duration}分)
+                    </span>
+                  </div>
+                  <div style={{ height:6, background:MC.border, borderRadius:3, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:3, width:`${Math.min(100,cron.sessionProgressPct)}%`, background: cron.isRunning ? `linear-gradient(90deg,${MC.accent},${MC.green})` : MC.textMuted }} />
+                  </div>
+                </div>
+                {/* ホスト・スケジュール */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6, display:"flex", flexDirection:"column", gap:4, fontSize:10 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>ホスト</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.cyan }}>{cron.host}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>開始時刻</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.text }}>{startLocal}</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>スケジュール</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.accent }}>{cron.scheduleTime}</span>
+                  </div>
+                </div>
+                {/* リアルタイム時刻 */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                  <div>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>⏱ 現在時刻（リアルタイム）</div>
+                    <div style={{ fontFamily:MC.mono, color:MC.green, fontSize:16, fontWeight:700, marginTop:1 }}>
+                      {new Date(now).toLocaleTimeString('ja-JP')}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>フェーズ</div>
+                    <Tag color={MC.accent}>{proj.phase || "Development"}</Tag>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </Panel>
         <Panel title="Boot コマンド" icon="⌨️">
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {[["Start-ClaudeOS.ps1","9ステップ初期化"],["Start-ClaudeOS.ps1 -DryRun","非破壊プレビュー"],["Start-ClaudeOS.ps1 -NonInteractive","CI / 自動実行向け"]].map(c => (
@@ -1495,8 +1606,8 @@ window.BootPanel = BootPanel;
        BLOCK 9: Event Log Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const LogPanel = () => {
-  const logs = window.EVENT_LOG;
+const LogPanel = ({ liveData }) => {
+  const logs = (liveData?.eventLog?.length ? liveData.eventLog : null) || window.EVENT_LOG;
   const [filter, setFilter] = React.useState("all");
   const [autoScroll, setAutoScroll] = React.useState(true);
   const logRef = React.useRef(null);
@@ -1505,6 +1616,7 @@ const LogPanel = () => {
     if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [filtered.length, autoScroll]);
   const typeColors = { info:MC.textDim, success:MC.green, decision:MC.amber, phase:MC.accent, error:MC.red };
+  const typeLabels = { info:"情報", success:"成功", decision:"判断", phase:"フェーズ", error:"エラー" };
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
@@ -1531,7 +1643,7 @@ const LogPanel = () => {
                   <td style={{ padding:"6px 12px", color:MC.textMuted, fontSize:10, whiteSpace:"nowrap" }}>{log.time}</td>
                   <td style={{ padding:"6px 12px", color:MC.text, fontSize:11 }}>{log.agent}</td>
                   <td style={{ padding:"6px 12px", color:typeColors[log.type]||MC.textDim, lineHeight:1.4 }}>{log.message}</td>
-                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{log.type}</Tag></td>
+                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{typeLabels[log.type]||log.type}</Tag></td>
                 </tr>
               ))}
             </tbody>
@@ -1555,6 +1667,9 @@ const App = () => {
   const [activePanel, setActivePanel] = React.useState("projects");
   const [sessionElapsed, setSessionElapsed] = React.useState(window.MOCK_STATE.execution.elapsed_minutes);
   const [, forceRender] = React.useState(0);
+  // liveData: 30秒ごとに /api/mc-data から取得した実データ
+  const [liveData, setLiveData] = React.useState(null);
+  const [lastUpdated, setLastUpdated] = React.useState(null);
 
   React.useEffect(() => {
     applyTheme(t.darkMode);
@@ -1566,16 +1681,29 @@ const App = () => {
     forceRender(n => n + 1);
   }, [t.accentColor]);
 
+  // 単一の 30秒ポーリング — 全パネルに liveData を供給
+  React.useEffect(() => {
+    const fetchAll = () => {
+      fetch('/api/mc-data')
+        .then(r => r.json())
+        .then(d => { setLiveData(d); setLastUpdated(new Date()); })
+        .catch(() => { /* モックデータで継続 */ });
+    };
+    fetchAll();
+    const tid = setInterval(fetchAll, 30000);
+    return () => clearInterval(tid);
+  }, []);
+
   const renderPanel = () => {
-    const state = window.MOCK_STATE;
+    const state = liveData?.state || window.MOCK_STATE;
     switch (activePanel) {
       case "projects":  return <ProjectsPanel />;
       case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} />;
-      case "agents":    return <AgentsPanel state={state} />;
-      case "cicd":      return <CICDPanel />;
-      case "cron":      return <CronPanel />;
-      case "boot":      return <BootPanel state={state} />;
-      case "log":       return <LogPanel />;
+      case "agents":    return <AgentsPanel state={state} liveData={liveData} />;
+      case "cicd":      return <CICDPanel liveData={liveData} />;
+      case "cron":      return <CronPanel liveData={liveData} />;
+      case "boot":      return <BootPanel state={state} liveData={liveData} />;
+      case "log":       return <LogPanel liveData={liveData} />;
       default:          return <ProjectsPanel />;
     }
   };
@@ -1586,7 +1714,8 @@ const App = () => {
         <div style={{ position:"fixed", top:0, left:0, right:0, bottom:0, pointerEvents:"none", zIndex:1000, background:"repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)" }} />
       )}
       <TopBar state={window.MOCK_STATE} sessionElapsed={sessionElapsed} setSessionElapsed={setSessionElapsed}
-        darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)} />
+        darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)}
+        lastUpdated={lastUpdated} />
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <SideNav active={activePanel} onChange={setActivePanel} />
         <main style={{ flex:1, padding:16, overflow:"auto", animation: t.animationsEnabled ? "mcFadeIn 0.3s ease" : "none" }} key={activePanel}>
