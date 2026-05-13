@@ -10,6 +10,9 @@
 > **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
 > Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
+> **🎨 v3.3.1 — Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新**
+> Cron管理週間スケジュール全幅レイアウト・正式名称2行表示・Boot Sequenceアクティブセッションパネル・イベントログ日本語化など、Mission Control WebUI のUX/UI を全面強化。`/goal` テンプレートを「MVP Release Candidate 完成版」（完了条件10項・対象外・停止条件明記）に刷新。
+
 > **🔄 v3.3.0 — テスト検証・デバッグ統合指示書 + Mission Control WebUI + START_PROMPT 強化**
 > `11-test-debug-integration.md` を新規追加（5カテゴリ：フロントエンド・バックエンド・セキュリティ・インフラ・DB の検証・デバッグ方法論 + Playwright E2E 必須 + Codex/CodeRabbit 統合フロー）。品質ゲート条件: Codex エラー=0 / CodeRabbit Critical/High=0 / テスト成功率100% / STABLE N=3。`_footer.md` に `/goal` 10ループテンプレートを追加。NASA風 Mission Control WebUI を `scripts/dashboards/mission-control.html` に実装（Projects/AgentTeams/CI/Cron/Boot/EventLog 6パネル）。
 
@@ -33,7 +36,7 @@
 
 | 項目 | 状態 |
 |------|------|
-| バージョン | **v3.2.107** (WebUI 全テスト検証 250 項目 全プロジェクト最終プロンプト追加) — 旧: v3.2.106 |
+| バージョン | **v3.3.1** (Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新) — 旧: v3.3.0 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |

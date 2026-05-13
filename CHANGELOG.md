@@ -2,6 +2,42 @@
 
 # CHANGELOG
 
+## [v3.3.1] - 2026-05-13 — Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新
+
+### 🎯 概要
+Mission Control WebUI の Cron管理・Boot Sequence・イベントログを全面的に改善。イベントログ時刻・種別タグを完全日本語化。`/goal` テンプレートを MVP Release Candidate 完成版に刷新。
+
+### 🔧 変更対象
+
+| ファイル | 変更内容 |
+|---|---|
+| `scripts/dashboards/mission-control.html` | Cron管理週間スケジュール全幅レイアウト / 正式名称2行表示 / Boot Sequenceアクティブセッションパネル / イベントログ日本語化 / Tag折り返し防止 |
+| `scripts/dashboards/serve-dashboard.js` | getActiveCronProject() 追加 / イベントログ時刻日本語変換 |
+| `Claude/templates/claude/START_PROMPT.md` | /goal テンプレート MVP RC 完成版に刷新（再ビルド 1902行） |
+| `Claude/templates/claude/instructions/_footer.md` | /goal テンプレートソース更新 |
+| `Claude/templates/claude/instructions/01-session-startup.md` | /goal 設定例を MVP RC 版に統一 |
+
+### ✅ 主な改善内容
+
+#### Cron管理 — 週間スケジュール
+- **全幅レイアウト**: 上段（Cronスケジュール一覧 + 登録サマリー/Cron設定サイドバー）/ 下段（週間スケジュール全幅）に変更。セル幅 48px → 約90px に拡大
+- **正式名称2行表示**: 省略名称を廃止し、ハイフン中間点で自動分割した正式名称を2行で表示（例: `Construction-DX-One-System` → `Construction-DX` / `One-System`）
+- **バグ修正**: 登録サマリー・Cron設定の右カラムがビューポート外に描画される CSS Grid overflow バグを `minWidth:0` 追加で修正
+- **フォントサイズ改善**: 登録サマリー・Cron設定のフォントを 11px → 12px に拡大
+
+#### Boot Sequence — アクティブセッション
+- **Cron自動検出パネル新設**: `cron-registry.json` から過去7日を遡り最近稼働したCronプロジェクトを自動検出して表示（プロジェクト名・ホスト・開始時刻・セッション進捗バー・スケジュール）
+- **リアルタイム時刻**: `useEffect + setInterval(1000ms)` による毎秒更新時刻表示
+
+#### イベントログ — 完全日本語化
+- **時刻**: `git log %cr`（英語相対時刻）を `%ct`（UNIXタイム）に変更し、サーバーサイドで日本語変換（「10 hours ago」→「10時間前」）
+- **種別タグ**: `typeLabels` マッピング追加（info→情報, success→成功, phase→フェーズ, decision→判断, error→エラー）
+- **Tag コンポーネント**: `whiteSpace:nowrap` 追加により全パネルのタグ折り返しを防止
+
+#### /goal テンプレート刷新
+- MVP Release Candidate 完成版に刷新（実施対象8項目・完了条件10項目・対象外5項目・停止条件4項目を明記）
+- `_footer.md`・`01-session-startup.md` ソース更新 → `Build-StartPrompt.ps1` で再ビルド（1902行）
+
 ## [v3.2.107] - 2026-04-30 — WebUI 全テスト検証・デバッグ 250 項目を全プロジェクト実行の最終プロンプトに追加
 
 ### 🎯 概要
