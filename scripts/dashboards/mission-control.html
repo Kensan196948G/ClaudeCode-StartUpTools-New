@@ -1200,8 +1200,10 @@ const CronPanel = ({ liveData }) => {
   }, [parsedSchedules]);
 
   return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:12, height:"100%" }}>
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+    <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
+      {/* ── Top row: Schedule table + Right sidebar ── */}
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:12, minWidth:0 }}>
+        <div style={{ minWidth:0 }}>
 
         {/* ── Schedule table ── */}
         <Panel title="Cronスケジュール一覧" icon="🕐" headerRight={
@@ -1261,15 +1263,84 @@ const CronPanel = ({ liveData }) => {
           </table>
         </Panel>
 
-        {/* ── Weekly calendar (dynamic hours) ── */}
-        <Panel title="週間スケジュール" icon="📅">
-          {calHours.length === 0 ? (
-            <div style={{ textAlign:"center", color:MC.textMuted, fontSize:12, padding:24 }}>
-              データ読み込み中...
+        </div>{/* end left col */}
+
+        {/* ── Right sidebar ── */}
+        <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+          <Panel title="登録サマリー" icon="📊">
+            <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:12 }}>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>総登録数</span>
+                <span style={{ fontFamily:MC.mono, color:MC.text, fontWeight:700 }}>{schedules.length}件</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>稼働中</span>
+                <span style={{ fontFamily:MC.mono, color:MC.green, fontWeight:700 }}>{schedules.filter(s=>s.status==="active").length}件</span>
+              </div>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ color:MC.textMuted }}>停止中</span>
+                <span style={{ fontFamily:MC.mono, color:MC.amber }}>{schedules.filter(s=>s.status==="paused").length}件</span>
+              </div>
+              <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, display:"flex", flexDirection:"column", gap:5 }}>
+                {schedules.filter(s=>s.status==="active").map((s,i) => (
+                  <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                    <span style={{ color:MC.textDim, fontSize:11, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>
+                      {s.project.replace(/-[A-Z]/g, m => m.toLowerCase()).split("-").slice(0,2).join("-")}
+                    </span>
+                    <span style={{ fontFamily:MC.mono, color:MC.accent, fontSize:11, flexShrink:0 }}>
+                      {formatNextRunDisplay(s.nextRun, s.schedule)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div style={{ overflowX:"auto" }}>
-              <div style={{ display:"grid", gridTemplateColumns:`52px repeat(7, minmax(72px,1fr))`, gap:2, minWidth:560 }}>
+          </Panel>
+
+          <Panel title="Cron設定" icon="⚙️">
+            <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:12 }}>
+              {[
+                ["実行時間","300分 (5h)",false],
+                ["Launcher","/home/kensan/.claudeos/cron-launcher.sh",true],
+                ["Sessions","/home/kensan/.claudeos/sessions",true],
+                ["Logs","/home/kensan/.claudeos/logs",true],
+                ["Prefix","CLAUDEOS",false],
+              ].map(([l,v,mono]) => (
+                <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
+                  <span style={{ color:MC.textMuted, flexShrink:0, fontSize:11 }}>{l}</span>
+                  <span style={{ fontFamily: mono ? MC.mono : MC.sans, color:MC.text, fontWeight:500, fontSize: mono ? 10 : 12, textAlign:"right", wordBreak:"break-all" }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          {showAdd && (
+            <Panel title="新規スケジュール登録" icon="➕">
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                {[["プロジェクト","project-name"],["ホスト","linux-dev-01"],["cron式","0 9 * * 1-6"],["実行時間(分)","300"]].map(([l,p]) => (
+                  <div key={l}>
+                    <div style={{ fontSize:11, color:MC.textMuted, marginBottom:4 }}>{l}</div>
+                    <input placeholder={p} style={{ width:"100%", padding:"6px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background:MC.bgCard, color:MC.text, fontSize:11, fontFamily:MC.mono, outline:"none", boxSizing:"border-box" }}
+                      onFocus={e => e.target.style.borderColor = MC.accent}
+                      onBlur={e => e.target.style.borderColor = MC.border} />
+                  </div>
+                ))}
+                <button style={{ padding:8, borderRadius:4, border:"none", background:MC.accent, color:MC.bg, fontSize:12, fontWeight:700, cursor:"pointer" }}
+                  onClick={() => setShowAdd(false)}>登録</button>
+              </div>
+            </Panel>
+          )}
+        </div>{/* end right sidebar */}
+      </div>{/* end top row grid */}
+
+      {/* ── Bottom row: Full-width weekly calendar ── */}
+      <Panel title="週間スケジュール" icon="📅">
+        {calHours.length === 0 ? (
+          <div style={{ textAlign:"center", color:MC.textMuted, fontSize:12, padding:24 }}>
+            データ読み込み中...
+          </div>
+        ) : (
+          <div style={{ overflowX:"auto" }}>
+            <div style={{ display:"grid", gridTemplateColumns:`52px repeat(7, minmax(80px,1fr))`, gap:2, minWidth:560 }}>
                 {/* Header row */}
                 <div></div>
                 {DOW_JP.map((d,i) => (
@@ -1299,27 +1370,43 @@ const CronPanel = ({ liveData }) => {
                       const bc = hits.length === 0 ? MC.border
                                : isActive  ? MC.accent+"70"
                                : MC.border;
-                      const label = hits.length > 1
-                        ? `${hits.length}件`
-                        : hits.length === 1
-                          ? hits[0].project.split("-")[0].substring(0,7)
-                          : "";
+                      // ハイフン中間点で2行分割
+                      const [calLine1, calLine2] = (() => {
+                        if (hits.length !== 1) return [hits.length > 1 ? `${hits.length}件` : "", ""];
+                        const name = hits[0].project;
+                        const parts = name.split('-');
+                        if (parts.length < 2) return [name, ""];
+                        const mid = Math.floor(name.length / 2);
+                        let bestIdx = 1, bestDist = Infinity, cumLen = parts[0].length;
+                        for (let i = 1; i < parts.length; i++) {
+                          const dist = Math.abs(cumLen - mid);
+                          if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+                          cumLen += 1 + parts[i].length;
+                        }
+                        return [parts.slice(0, bestIdx).join('-'), parts.slice(bestIdx).join('-')];
+                      })();
                       return (
                         <div key={day}
                           title={hits.map(s => `${s.project} (${formatScheduleDisplay(s.schedule)})`).join("\n")}
                           style={{
-                            height:34, borderRadius:4,
+                            minHeight:34, height:"auto", borderRadius:4,
+                            padding:"4px 3px",
                             background:bg, border:`1px solid ${bc}`,
                             display:"flex", flexDirection:"column",
                             alignItems:"center", justifyContent:"center",
-                            gap:1, cursor: hits.length > 0 ? "help" : "default",
+                            gap:0, cursor: hits.length > 0 ? "help" : "default",
                             transition:"all 0.15s",
                           }}>
                           {hits.length > 0 && (
                             <>
-                              <span style={{ fontSize:9, fontWeight:700, fontFamily:MC.mono, color: isActive ? MC.accent : MC.textMuted, lineHeight:1 }}>
-                                {label}
+                              <span style={{ fontSize:9, fontWeight:700, fontFamily:MC.mono, color: isActive ? MC.accent : MC.textMuted, lineHeight:1.35, textAlign:"center", whiteSpace:"normal", overflowWrap:"anywhere", width:"100%" }}>
+                                {calLine1}
                               </span>
+                              {calLine2 && (
+                                <span style={{ fontSize:9, fontWeight:600, fontFamily:MC.mono, color: isActive ? MC.accent+"cc" : MC.textDim, lineHeight:1.35, textAlign:"center", whiteSpace:"normal", overflowWrap:"anywhere", width:"100%" }}>
+                                  {calLine2}
+                                </span>
+                              )}
                               {isPaused && (
                                 <span style={{ fontSize:8, color:MC.amber }}>⏸</span>
                               )}
@@ -1334,73 +1421,6 @@ const CronPanel = ({ liveData }) => {
             </div>
           )}
         </Panel>
-      </div>
-
-      {/* ── Right sidebar ── */}
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <Panel title="登録サマリー" icon="📊">
-          <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>総登録数</span>
-              <span style={{ fontFamily:MC.mono, color:MC.text, fontWeight:700 }}>{schedules.length}件</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>稼働中</span>
-              <span style={{ fontFamily:MC.mono, color:MC.green, fontWeight:700 }}>{schedules.filter(s=>s.status==="active").length}件</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ color:MC.textMuted }}>停止中</span>
-              <span style={{ fontFamily:MC.mono, color:MC.amber }}>{schedules.filter(s=>s.status==="paused").length}件</span>
-            </div>
-            <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, display:"flex", flexDirection:"column", gap:5 }}>
-              {schedules.filter(s=>s.status==="active").map((s,i) => (
-                <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                  <span style={{ color:MC.textDim, fontSize:10, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>
-                    {s.project.replace(/-[A-Z]/g, m => m.toLowerCase()).split("-").slice(0,2).join("-")}
-                  </span>
-                  <span style={{ fontFamily:MC.mono, color:MC.accent, fontSize:10, flexShrink:0 }}>
-                    {formatNextRunDisplay(s.nextRun, s.schedule)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Cron設定" icon="⚙️">
-          <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
-            {[
-              ["実行時間","300分 (5h)",false],
-              ["Launcher","/home/kensan/.claudeos/cron-launcher.sh",true],
-              ["Sessions","/home/kensan/.claudeos/sessions",true],
-              ["Logs","/home/kensan/.claudeos/logs",true],
-              ["Prefix","CLAUDEOS",false],
-            ].map(([l,v,mono]) => (
-              <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:6 }}>
-                <span style={{ color:MC.textMuted, flexShrink:0, fontSize:10 }}>{l}</span>
-                <span style={{ fontFamily: mono ? MC.mono : MC.sans, color:MC.text, fontWeight:500, fontSize: mono ? 9 : 11, textAlign:"right", wordBreak:"break-all" }}>{v}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        {showAdd && (
-          <Panel title="新規スケジュール登録" icon="➕">
-            <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-              {[["プロジェクト","project-name"],["ホスト","linux-dev-01"],["cron式","0 9 * * 1-6"],["実行時間(分)","300"]].map(([l,p]) => (
-                <div key={l}>
-                  <div style={{ fontSize:10, color:MC.textMuted, marginBottom:4 }}>{l}</div>
-                  <input placeholder={p} style={{ width:"100%", padding:"6px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background:MC.bgCard, color:MC.text, fontSize:11, fontFamily:MC.mono, outline:"none", boxSizing:"border-box" }}
-                    onFocus={e => e.target.style.borderColor = MC.accent}
-                    onBlur={e => e.target.style.borderColor = MC.border} />
-                </div>
-              ))}
-              <button style={{ padding:8, borderRadius:4, border:"none", background:MC.accent, color:MC.bg, fontSize:12, fontWeight:700, cursor:"pointer" }}
-                onClick={() => setShowAdd(false)}>登録</button>
-            </div>
-          </Panel>
-        )}
-      </div>
     </div>
   );
 };
