@@ -35,11 +35,11 @@ governance/20-audit-policy.md
 `state.json` の `goal_type` フィールドを読み、対応ファイルを Read すること。
 
 ```text
-mvp-release        → goals/mvp-release.md
-production-release → goals/production-release.md
-hotfix             → goals/hotfix.md
-security-emergency → goals/security-emergency.md
-refactoring        → goals/refactoring.md
+mvp-release        → .claude/claudeos/goals/mvp-release.md
+production-release → .claude/claudeos/goals/production-release.md
+hotfix             → .claude/claudeos/goals/hotfix.md
+security-emergency → .claude/claudeos/goals/security-emergency.md
+refactoring        → .claude/claudeos/goals/refactoring.md
 ```
 
 ## ⚡ 起動後必須実行

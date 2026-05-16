@@ -900,7 +900,37 @@ Agent Teams で並列に動き、Agent View で監視する。
 必ず検証する。Goal 達成後は適切に終了する。
 ```
 
-## 23. 参照先
+## 23. Trust Ledger（自律判断範囲の段階的拡大）
+
+`state.json` の `trust.level` に応じて CTO の自律可能な操作範囲が変わる。
+詳細: `.claude/claudeos/docs/trust-ledger.md`
+
+| Level | score 条件 | 追加で自律可能な操作 |
+|---|---|---|
+| 1 | 0.0〜0.84 | ファイル編集・テスト・Issue起票・Draft PR |
+| 2 | 0.85〜0.94 | + PR作成・auto_merge（CI全通過時） |
+| 3 | 0.95〜1.00 | + Staging デプロイ |
+
+> 本番デプロイは Level 3 でも人間サインオフ必須
+
+**CTO 行動ルール:**
+- セッション開始時に `trust.level` を確認し、許可操作範囲内で行動する
+- セッション終了時に `trust.history` を更新し `trust.score` を再計算する
+- Security Critical 検出時は即座に Level 1 へ降格する
+
+## 23.1 Agent Communication Protocol（GitHub Issues メッセージバス）
+
+複数 Claude セッションが並列動作する場合、GitHub Issues を通信チャネルとして使用する。
+詳細: `.claude/claudeos/docs/agent-communication-protocol.md`
+
+```bash
+# セッション開始時に未処理のエージェントメッセージを確認する
+gh issue list --label "agent-msg,status:open" --limit 10
+```
+
+緊急メッセージ（`priority:urgent`）は現在の作業を中断して最優先で処理する。
+
+## 24. 参照先
 
 | レイヤー | ファイル |
 |---|---|
@@ -916,10 +946,12 @@ Agent Teams で並列に動き、Agent View で監視する。
 | CI | `claudeos/ci/ci-manager.md` |
 | Evolution | `claudeos/evolution/self-evolution.md` |
 | CTO | `claudeos/executive/ai-cto.md` |
+| Trust Ledger | `claudeos/docs/trust-ledger.md` |
+| Agent通信 | `claudeos/docs/agent-communication-protocol.md` |
 | /goal 公式 docs | `https://code.claude.com/docs/en/goal` |
 | グローバル設定 | `~/.claude/CLAUDE.md` |
 
-## 24. 保守フェーズ（リリース後）
+## 25. 保守フェーズ（リリース後）
 
 リリース達成後は `state.json` の `project.phase_mode` を `"maintenance"` に変更し、
 以下の保守ポリシーへ自動移行します。
