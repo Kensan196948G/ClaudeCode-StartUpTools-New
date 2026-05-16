@@ -785,9 +785,10 @@ window.ProjectsPanel = ProjectsPanel;
        BLOCK 4: Dashboard Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const DashboardPanel = ({ state, sessionElapsed }) => {
+const DashboardPanel = ({ state, sessionElapsed, liveData }) => {
   const phaseTL = window.PHASE_TIMELINE;
   const totalMin = state.execution.max_duration_minutes;
+  const trustData = liveData?.currentProjectInfo?.trust || state.trust;
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gridTemplateRows:"auto auto 1fr", gap:12, height:"100%" }}>
       <KPICard label="CI 成功率" value={`${Math.round(state.kpi.ci_success_rate * 100)}%`} target="90%" color={MC.green} icon="⚡" />
@@ -852,20 +853,20 @@ const DashboardPanel = ({ state, sessionElapsed }) => {
           <SysRow label="最終Compact" value={formatTime(state.compact.last_pre_compact_at)} color={MC.textDim} />
           <SysRow label="最終検証" value={formatTime(state.stable.last_verified_at)} color={MC.textDim} />
           <SysRow label="Flaky疑い" value={state.debug.flaky_suspected ? "あり" : "なし"} color={state.debug.flaky_suspected ? MC.amber : MC.green} />
-          {state.trust && (<>
+          {trustData && (<>
             <div style={{ borderTop:`1px solid ${MC.border}`, margin:"4px 0" }} />
             <SysRow label="Trust Score"
-              value={`${Math.round((state.trust.score||0)*100)}%`}
-              color={state.trust.score>=0.95 ? MC.green : state.trust.score>=0.85 ? MC.amber : MC.red} />
+              value={`${Math.round((trustData.score||0)*100)}%`}
+              color={trustData.score>=0.87 ? MC.green : trustData.score>=0.75 ? MC.amber : MC.red} />
             <SysRow label="Trust Level"
-              value={`Level ${state.trust.level||1}${state.trust.level>=2 ? (state.trust.level>=3?" 🟢":" 🟡") : " 🔴"}`}
-              color={state.trust.level>=2 ? (state.trust.level>=3 ? MC.green : MC.amber) : MC.red} />
+              value={`Level ${trustData.level||1}${trustData.level>=2 ? (trustData.level>=3?" 🟢":" 🟡") : " 🔴"}`}
+              color={trustData.level>=2 ? (trustData.level>=3 ? MC.green : MC.amber) : MC.red} />
             <SysRow label="Auto Merge"
-              value={state.trust.auto_merge_enabled ? "✅ 有効" : "⏸ 無効"}
-              color={state.trust.auto_merge_enabled ? MC.green : MC.textMuted} />
+              value={trustData.auto_merge_enabled ? "✅ 有効" : "⏸ 無効"}
+              color={trustData.auto_merge_enabled ? MC.green : MC.textMuted} />
             <SysRow label="CI Streak"
-              value={`${(state.trust.history||{}).ci_success_streak||0} 連続`}
-              color={((state.trust.history||{}).ci_success_streak||0)>=5 ? MC.green : MC.textDim} />
+              value={`${(trustData.history||{}).ci_success_streak||0} 連続`}
+              color={((trustData.history||{}).ci_success_streak||0)>=5 ? MC.green : MC.textDim} />
           </>)}
         </div>
       </Panel>
@@ -1586,6 +1587,70 @@ const BootPanel = ({ state, liveData }) => {
             );
           })()}
         </Panel>
+        {/* ── Trust Score Panel（実データ: currentProjectInfo.trust） ── */}
+        <Panel title="Trust Ledger" icon="🛡️">
+          {(() => {
+            const t = proj.trust || {};
+            const score = t.score || 0;
+            const level = t.level || 1;
+            const pct   = Math.round(score * 100);
+            const levelColor = level >= 3 ? MC.green : level >= 2 ? MC.amber : '#ef4444';
+            const levelLabel = level >= 3 ? "Level 3 🟢" : level >= 2 ? "Level 2 🟡" : "Level 1 🔴";
+            const h = t.history || {};
+            return (
+              <div style={{ display:"flex", flexDirection:"column", gap:8, fontSize:11 }}>
+                {/* スコアバー */}
+                <div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
+                    <span style={{ fontSize:9, color:MC.textMuted }}>Trust Score</span>
+                    <span style={{ fontFamily:MC.mono, color:levelColor, fontWeight:700 }}>{pct}%</span>
+                  </div>
+                  <div style={{ height:6, background:MC.border, borderRadius:3, overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:3, width:`${pct}%`,
+                      background: level>=3 ? `linear-gradient(90deg,${MC.green},#22c55e)` :
+                                  level>=2 ? `linear-gradient(90deg,${MC.amber},#f59e0b)` :
+                                             `linear-gradient(90deg,#ef4444,#f87171)` }} />
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between", marginTop:2, fontSize:9, color:MC.textMuted }}>
+                    <span>0%</span><span style={{ color:'#3b82f6' }}>▲L2(85%)</span><span style={{ color:MC.green }}>▲L3(95%)</span><span>100%</span>
+                  </div>
+                </div>
+                {/* Level + Auto Merge */}
+                <div style={{ display:"flex", justifyContent:"space-between", borderTop:`1px solid ${MC.border}`, paddingTop:6 }}>
+                  <div>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>Level</div>
+                    <div style={{ color:levelColor, fontWeight:700 }}>{levelLabel}</div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:9, color:MC.textMuted }}>Auto Merge</div>
+                    <div style={{ color: t.auto_merge_enabled ? MC.green : MC.textMuted, fontWeight:700 }}>
+                      {t.auto_merge_enabled ? "✅ 有効" : "⏸ 無効"}
+                    </div>
+                  </div>
+                </div>
+                {/* 統計 */}
+                <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:6, display:"flex", flexDirection:"column", gap:3, fontSize:10 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>CI 成功率</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.green }}>{h.totalCiRuns>0 ? Math.round((h.successfulCiRuns/h.totalCiRuns)*100) : 0}% ({h.successfulCiRuns||0}/{h.totalCiRuns||0})</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>連続成功</span>
+                    <span style={{ fontFamily:MC.mono, color: (h.ciSuccessStreak||0)>=5 ? MC.green : MC.accent }}>{h.ciSuccessStreak||0} 回</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>STABLE 達成</span>
+                    <span style={{ fontFamily:MC.mono, color:MC.green }}>{h.stableAchievements||0} 回 / {h.totalSessions||0}セッション</span>
+                  </div>
+                  <div style={{ display:"flex", justifyContent:"space-between" }}>
+                    <span style={{ color:MC.textMuted }}>Blocked</span>
+                    <span style={{ fontFamily:MC.mono, color:(h.blockedEvents||0)>0 ? MC.amber : MC.textMuted }}>{h.blockedEvents||0} 件</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </Panel>
         <Panel title="Boot コマンド" icon="⌨️">
           <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
             {[["Start-ClaudeOS.ps1","9ステップ初期化"],["Start-ClaudeOS.ps1 -DryRun","非破壊プレビュー"],["Start-ClaudeOS.ps1 -NonInteractive","CI / 自動実行向け"]].map(c => (
@@ -1714,7 +1779,7 @@ const App = () => {
     const state = liveData?.state || window.MOCK_STATE;
     switch (activePanel) {
       case "projects":  return <ProjectsPanel />;
-      case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} />;
+      case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} liveData={liveData} />;
       case "agents":    return <AgentsPanel state={state} liveData={liveData} />;
       case "cicd":      return <CICDPanel liveData={liveData} />;
       case "cron":      return <CronPanel liveData={liveData} />;

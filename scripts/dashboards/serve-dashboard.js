@@ -697,6 +697,30 @@ function getCurrentProjectInfo() {
     goal  = st?.goal?.title || (typeof st?.goal === 'string' ? st.goal : null) || '—';
     phase = st?.phase || '—';
   } catch {}
+
+  // Trust Score: trust-score.json から実データを読み込む
+  let trust = { score: 0.0, level: 1, auto_merge_enabled: false, history: {} };
+  try {
+    const tsFile = path.join(PROJ_ROOT, '.claude', 'claudeos', 'data', 'trust-score.json');
+    if (fs.existsSync(tsFile)) {
+      const ts = JSON.parse(fs.readFileSync(tsFile, 'utf8'));
+      trust = {
+        score:             ts.score              ?? 0.0,
+        level:             ts.level              ?? 1,
+        auto_merge_enabled: ts.auto_merge_enabled ?? false,
+        history: {
+          totalCiRuns:      (ts.history || {}).total_ci_runs       ?? 0,
+          successfulCiRuns: (ts.history || {}).successful_ci_runs  ?? 0,
+          ciSuccessStreak:  (ts.history || {}).ci_success_streak   ?? 0,
+          stableAchievements: (ts.history || {}).stable_achievements ?? 0,
+          totalSessions:    (ts.history || {}).total_sessions      ?? 0,
+          blockedEvents:    (ts.history || {}).blocked_events      ?? 0,
+          lastUpdated:      (ts.history || {}).last_updated        ?? '',
+        },
+      };
+    }
+  } catch {}
+
   // Active Cron project (most recently running)
   const activeCron = getActiveCronProject();
   return {
@@ -704,6 +728,7 @@ function getCurrentProjectInfo() {
     todayCommitList: todayCommitList.slice(0, 5),
     goal, phase,
     activeCron,
+    trust,
     checkedAt: new Date().toISOString(),
   };
 }

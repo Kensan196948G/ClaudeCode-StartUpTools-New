@@ -187,6 +187,45 @@ try {
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at + learning recorded)");
 
+    // ① Trust Ledger: stable_achievements をセッション終了時に更新（formula 完全版）
+    // GitHub Actions の trust-score-update.yml は CI runs のみ追跡するため
+    // stable_bonus (30%) の反映にはこの hook からの書き込みが必要。
+    try {
+      const stableAchieved = !!((state.stable || {}).stable_achieved);
+      const tsFile = path.join(process.cwd(), ".claude", "claudeos", "data", "trust-score.json");
+      const ts = readJson(tsFile) || {
+        schema_version: "1.0", score: 0.0, level: 1, auto_merge_enabled: false, history: {}
+      };
+      const h = ts.history || {};
+      h.total_sessions     = (h.total_sessions     || 0) + 1;
+      h.stable_achievements = stableAchieved ? (h.stable_achievements || 0) + 1 : (h.stable_achievements || 0);
+      h.last_updated        = new Date().toISOString();
+      ts.history = h;
+
+      // 完全版 formula（trust-ledger.md 準拠）
+      const total    = h.total_ci_runs        || 0;
+      const success  = h.successful_ci_runs   || 0;
+      const streak   = h.ci_success_streak    || 0;
+      const blocked  = h.blocked_events       || 0;
+      const stableN  = h.stable_achievements  || 0;
+      const sessN    = Math.max(h.total_sessions || 1, 1);
+
+      const base_score    = total > 0 ? (success / total) * 0.5 : 0;
+      const stable_bonus  = (stableN / sessN) * 0.3;
+      const streak_bonus  = Math.min(streak / 10, 1.0) * 0.1;
+      const block_penalty = Math.min(blocked * 0.05, 0.2);
+      const score = Math.max(0, Math.min(1, base_score + stable_bonus + streak_bonus - block_penalty));
+
+      ts.score              = Math.round(score * 10000) / 10000;
+      ts.level              = score >= 0.95 ? 3 : score >= 0.85 ? 2 : 1;
+      ts.auto_merge_enabled = score >= 0.85;
+      ts.updated_at         = h.last_updated;
+      writeJsonAtomic(tsFile, ts);
+      console.log(`[TrustLedger] sess=${h.total_sessions} stable=${stableN} score=${ts.score.toFixed(4)} level=${ts.level}`);
+    } catch (tsErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[TrustLedger] update failed: ${tsErr.message}`);
+    }
+
     // Webhook: session_end イベントを外部へ通知（detached spawn）
     try {
       const { spawn } = require("child_process");

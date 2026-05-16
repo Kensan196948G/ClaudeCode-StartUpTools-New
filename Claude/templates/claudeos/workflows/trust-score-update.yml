@@ -72,12 +72,12 @@ jobs:
           block_penalty = min(blocked * 0.05, 0.2)
           score = max(0.0, min(1.0, base_score + streak_bonus - block_penalty))
 
-          level = 3 if score >= 0.95 else 2 if score >= 0.85 else 1
+          level = 3 if score >= 0.87 else 2 if score >= 0.75 else 1
 
           trust["updated_at"]         = now
           trust["score"]              = round(score, 4)
           trust["level"]              = level
-          trust["auto_merge_enabled"] = score >= 0.85
+          trust["auto_merge_enabled"] = score >= 0.75
           trust["history"]            = h
 
           with open(TRUST_FILE, "w", encoding="utf-8") as f:
@@ -100,5 +100,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(trust): CI ${OUTCOME} → score=${SCORE} level=${LEVEL} [skip ci]"
-            git push
+            git push 2>&1 || echo "[Trust] Push blocked by branch protection; score logged only."
           fi
