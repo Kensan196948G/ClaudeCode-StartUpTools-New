@@ -104,6 +104,18 @@ try {
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] deploy-runbook skipped: ${drErr.message}`);
     }
 
+    // GitHub Projects 同期: completed_issues / blocked_issues のラベルを自動更新。
+    try {
+      const syncScript = path.join(process.cwd(), "scripts", "tools", "sync-github-projects.js");
+      if (fs.existsSync(syncScript)) {
+        const { spawnSync } = require("child_process");
+        const r = spawnSync(process.execPath, [syncScript], { cwd: process.cwd(), encoding: "utf8", timeout: 30000 });
+        if (r.stdout) console.log(r.stdout.trim().split("\n").map(l => `[Projects] ${l}`).join("\n"));
+      }
+    } catch (projErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] projects-sync skipped: ${projErr.message}`);
+    }
+
     // TDD coverage scan: 直近の変更ファイルに対応テストが無ければ warning 追加。
     try {
       const tdd = require("./tdd-coverage-scan.js");
