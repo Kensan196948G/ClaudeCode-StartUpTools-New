@@ -217,8 +217,8 @@ try {
       const score = Math.max(0, Math.min(1, base_score + stable_bonus + streak_bonus - block_penalty));
 
       ts.score              = Math.round(score * 10000) / 10000;
-      ts.level              = score >= 0.95 ? 3 : score >= 0.85 ? 2 : 1;
-      ts.auto_merge_enabled = score >= 0.85;
+      ts.level              = score >= 0.87 ? 3 : score >= 0.75 ? 2 : 1;
+      ts.auto_merge_enabled = score >= 0.75;
       ts.updated_at         = h.last_updated;
       writeJsonAtomic(tsFile, ts);
       console.log(`[TrustLedger] sess=${h.total_sessions} stable=${stableN} score=${ts.score.toFixed(4)} level=${ts.level}`);
