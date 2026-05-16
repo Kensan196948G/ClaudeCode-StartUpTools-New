@@ -239,6 +239,23 @@ function buildProjectData(entry) {
   const kpi    = state.kpi     || {};
   const stable = state.stable  || {};
 
+  // Trust Ledger: state.json の trust フィールドを優先し、なければ trust-score.json を参照
+  let trustData = state.trust || {};
+  if (entry.hasCron && !trustData.score) {
+    try {
+      const tsFile = path.join(PROJECTS_DIR, entry.project, '.claude', 'claudeos', 'data', 'trust-score.json');
+      if (fs.existsSync(tsFile)) {
+        const ts = JSON.parse(fs.readFileSync(tsFile, 'utf8'));
+        trustData = {
+          score:             ts.score             ?? 0.0,
+          level:             ts.level             ?? 1,
+          auto_merge_enabled: ts.auto_merge_enabled ?? false,
+          history:           ts.history           || {},
+        };
+      }
+    } catch { /* graceful degradation */ }
+  }
+
   // registration_date が未設定なら Cron created を初期値に使う
   if (!proj.registration_date && !proj.start_date && entry.created) {
     proj.registration_date = entry.created.split('T')[0];
@@ -270,6 +287,19 @@ function buildProjectData(entry) {
       achieved:    stable.stable_achieved    || false,
       consecutive: stable.consecutive_success || 0,
       targetN:     stable.target_n            || 3,
+    } : null,
+    trust: entry.hasCron ? {
+      score:           trustData.score              ?? 0.0,
+      level:           trustData.level              ?? 1,
+      autoMergeEnabled: trustData.auto_merge_enabled ?? false,
+      history: {
+        totalCiRuns:       (trustData.history || {}).total_ci_runs        ?? 0,
+        successfulCiRuns:  (trustData.history || {}).successful_ci_runs   ?? 0,
+        ciSuccessStreak:   (trustData.history || {}).ci_success_streak    ?? 0,
+        blockedEvents:     (trustData.history || {}).blocked_events       ?? 0,
+        lastCiOutcome:     (trustData.history || {}).last_ci_outcome      ?? '',
+        lastUpdated:       (trustData.history || {}).last_updated         ?? '',
+      },
     } : null,
     session: entry.hasCron ? getLatestSession(entry.project) : null,
   };

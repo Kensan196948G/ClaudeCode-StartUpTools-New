@@ -918,6 +918,8 @@ Agent Teams で並列に動き、Agent View で監視する。
 - セッション終了時に `trust.history` を更新し `trust.score` を再計算する
 - Security Critical 検出時は即座に Level 1 へ降格する
 - **Blocked 発生時**: Issue に `blocked` ラベルを付与すること（GitHub Actions が `blocked_events` を自動インクリメントする）
+- **Level 2 以上での PR 作成時**: CI 全通過を確認してから `gh pr merge <番号> --auto --squash` を実行すること（詳細: `.claude/claudeos/docs/auto-merge-protocol.md`）
+- **Level 2 禁止（手動必須）**: 認証・認可変更 / DB スキーマ変更 / 本番デプロイ / Security Critical 残存 PR
 
 ## 23.1 Agent Communication Protocol（GitHub Issues メッセージバス）
 

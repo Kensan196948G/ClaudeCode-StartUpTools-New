@@ -186,7 +186,8 @@ const MOCK_STATE = {
   automation: { auto_issue_generation: true, self_evolution: true },
   learning: { usage_history: { agents: { "security-reviewer": { call_count: 12 }, "e2e-runner": { call_count: 8 }, "tester": { call_count: 15 } } } },
   debug: { last_failure_category: null, same_error_retry_count: 0, rescue_retry_count: 0, flaky_suspected: false },
-  compact: { trigger_at_pct: 70, last_pre_compact_at: new Date(Date.now() - 7200000).toISOString() }
+  compact: { trigger_at_pct: 70, last_pre_compact_at: new Date(Date.now() - 7200000).toISOString() },
+  trust: { score: 0.72, level: 1, auto_merge_enabled: false, history: { total_ci_runs: 12, successful_ci_runs: 10, ci_success_streak: 4, blocked_events: 1 } }
 };
 
 const AGENTS_DATA = [
@@ -851,6 +852,21 @@ const DashboardPanel = ({ state, sessionElapsed }) => {
           <SysRow label="最終Compact" value={formatTime(state.compact.last_pre_compact_at)} color={MC.textDim} />
           <SysRow label="最終検証" value={formatTime(state.stable.last_verified_at)} color={MC.textDim} />
           <SysRow label="Flaky疑い" value={state.debug.flaky_suspected ? "あり" : "なし"} color={state.debug.flaky_suspected ? MC.amber : MC.green} />
+          {state.trust && (<>
+            <div style={{ borderTop:`1px solid ${MC.border}`, margin:"4px 0" }} />
+            <SysRow label="Trust Score"
+              value={`${Math.round((state.trust.score||0)*100)}%`}
+              color={state.trust.score>=0.95 ? MC.green : state.trust.score>=0.85 ? MC.amber : MC.red} />
+            <SysRow label="Trust Level"
+              value={`Level ${state.trust.level||1}${state.trust.level>=2 ? (state.trust.level>=3?" 🟢":" 🟡") : " 🔴"}`}
+              color={state.trust.level>=2 ? (state.trust.level>=3 ? MC.green : MC.amber) : MC.red} />
+            <SysRow label="Auto Merge"
+              value={state.trust.auto_merge_enabled ? "✅ 有効" : "⏸ 無効"}
+              color={state.trust.auto_merge_enabled ? MC.green : MC.textMuted} />
+            <SysRow label="CI Streak"
+              value={`${(state.trust.history||{}).ci_success_streak||0} 連続`}
+              color={((state.trust.history||{}).ci_success_streak||0)>=5 ? MC.green : MC.textDim} />
+          </>)}
         </div>
       </Panel>
     </div>
