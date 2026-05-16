@@ -19,12 +19,16 @@
 
 const fs   = require("fs");
 const path = require("path");
+const os   = require("os");
 
 // ------------------------------------------------------------------ 定数
 const BANK_FILE         = "reasoning-bank.json";
+const GLOBAL_BANK_FILE  = "global-reasoning-bank.json";
+const GLOBAL_DATA_DIR   = path.join(os.homedir(), ".claude", "data");
 const MIN_CONFIDENCE    = 0.15;   // これ以下は prune で自動削除
 const SAVE_THRESHOLD    = 0.30;   // buildEntry がエントリを返す最低ライン
 const MAX_ENTRIES       = 200;    // バンク上限（超えたら低信頼を削除）
+const MAX_GLOBAL_ENTRIES = 500;   // グローバルバンク上限（多プロジェクト分を収容）
 const SIMILARITY_THRESH = 0.60;   // Jaccard 類似度がこれ以上なら重複と判定
 
 // ------------------------------------------------------------------ I/O
@@ -44,12 +48,39 @@ function loadBank(dataDir) {
   const file = path.join(dataDir, BANK_FILE);
   const existing = readJson(file);
   if (existing && Array.isArray(existing.entries)) return existing;
-  return { version: "1.0", description: "ClaudeOS ReasoningBank", entries: [] };
+  return { schema_version: "2.0", description: "ClaudeOS ReasoningBank", entries: [], negative_patterns: [] };
 }
 
 function saveBank(dataDir, bank) {
   fs.mkdirSync(dataDir, { recursive: true });
   writeJsonAtomic(path.join(dataDir, BANK_FILE), bank);
+}
+
+// ------------------------------------------------------------------ グローバルバンク I/O（Cross-project）
+
+function loadGlobalBank() {
+  const file = path.join(GLOBAL_DATA_DIR, GLOBAL_BANK_FILE);
+  const existing = readJson(file);
+  if (existing && Array.isArray(existing.entries)) return existing;
+  return {
+    schema_version: "2.0",
+    description: "ClaudeOS Global ReasoningBank — 全プロジェクト横断パターンストア",
+    entries: [],
+    negative_patterns: [],
+  };
+}
+
+function saveGlobalBank(bank) {
+  fs.mkdirSync(GLOBAL_DATA_DIR, { recursive: true });
+  writeJsonAtomic(path.join(GLOBAL_DATA_DIR, GLOBAL_BANK_FILE), bank);
+}
+
+function pruneGlobalBank(bank) {
+  bank.entries = bank.entries
+    .filter(e => (e.confidence || 0) >= MIN_CONFIDENCE)
+    .sort((a, b) => (b.confidence || 0) - (a.confidence || 0))
+    .slice(0, MAX_GLOBAL_ENTRIES);
+  return bank;
 }
 
 // ------------------------------------------------------------------ タグ抽出
@@ -155,6 +186,7 @@ function buildEntry(state, projectName) {
   const now = new Date().toISOString();
   const uid = `${now.slice(0, 19).replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 6)}`;
 
+  const isSuccess = !!stab.stable_achieved;
   return {
     id:                  `rb-${uid}`,
     timestamp:           now,
@@ -163,8 +195,10 @@ function buildEntry(state, projectName) {
     problem_pattern:     detectProblemPattern(summary),
     approach:            summary.slice(0, 250),
     tags:                extractTags(summary),
-    outcome:             stab.stable_achieved ? "success" : "partial",
-    stable_achieved:     !!stab.stable_achieved,
+    outcome:             isSuccess ? "success" : "partial",
+    success_count:       isSuccess ? 1 : 0,
+    failure_count:       isSuccess ? 0 : 1,
+    stable_achieved:     isSuccess,
     ci_passed:           ciPassed,
     consecutive_success: stab.consecutive_success || 0,
     confidence,
@@ -194,8 +228,16 @@ function isSimilar(existing, incoming) {
 function upsertEntry(bank, entry) {
   const dup = bank.entries.find(e => isSimilar(e, entry));
   if (dup) {
-    // 既存エントリの信頼スコアをより高い方に更新
-    dup.confidence  = Math.min(1.0, Math.max(dup.confidence, entry.confidence));
+    // success_count / failure_count を累積（v2.0）
+    if (entry.outcome === "success") {
+      dup.success_count = (dup.success_count || 0) + 1;
+    } else {
+      dup.failure_count = (dup.failure_count || 0) + 1;
+    }
+    // confidence: success_count/total と既存スコアの高い方を採用
+    const total = (dup.success_count || 0) + (dup.failure_count || 0);
+    const ratioConf = total > 0 ? dup.success_count / total : 0;
+    dup.confidence  = Math.min(1.0, Math.max(entry.confidence, ratioConf));
     dup.last_used   = entry.timestamp;
     dup.used_count  = (dup.used_count || 0) + 1;
     dup.approach    = entry.approach;   // 最新のアプローチで上書き
@@ -283,16 +325,48 @@ function retrieveRelevantPatterns(bank, projectName, phase, currentTags, topN) {
     .map(x => x.entry);
 }
 
+// Cross-project: ローカル + グローバルバンクを統合してパターン検索
+// 他プロジェクトのエントリは +0.10（同プロジェクトの +0.30 より低い）
+function retrieveRelevantPatternsGlobal(localBank, projectName, phase, currentTags, topN) {
+  topN = topN || 5;
+  const globalBank = loadGlobalBank();
+
+  // グローバルにしかないエントリ（IDで重複排除）
+  const localIds = new Set(localBank.entries.map(e => e.id));
+  const globalOnly = globalBank.entries.filter(e => !localIds.has(e.id));
+
+  const allEntries = [...localBank.entries, ...globalOnly];
+
+  return allEntries
+    .filter(e => (e.confidence || 0) >= RETRIEVE_CONF_THRESHOLD)
+    .map(e => {
+      let score = e.confidence;
+      if (e.project === projectName) score += 0.30;  // 同プロジェクト優先
+      else                           score += 0.10;  // 他プロジェクトも参照（小ボーナス）
+      if (e.phase === phase)         score += 0.20;
+      const tagOverlap = (e.tags || []).filter(t => (currentTags || []).includes(t)).length;
+      score += tagOverlap * 0.10;
+      return { entry: e, score: Math.round(score * 100) / 100 };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN)
+    .map(x => x.entry);
+}
+
 // ------------------------------------------------------------------ 公開 API
 
 module.exports = {
   loadBank,
   saveBank,
+  loadGlobalBank,
+  saveGlobalBank,
+  pruneGlobalBank,
   buildEntry,
   upsertEntry,
   pruneBank,
   updateSONAWeights,
   retrieveRelevantPatterns,
+  retrieveRelevantPatternsGlobal,
   extractTags,
   detectProblemPattern,
   calcConfidence,
