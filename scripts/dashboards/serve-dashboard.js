@@ -679,6 +679,15 @@ function getActiveCronProject() {
   return bestEntry;
 }
 
+/** Trust Score: trust-score.json を読み込んで返す（/health エンドポイント共用） */
+function readTrustScore() {
+  try {
+    const tsFile = path.join(PROJ_ROOT, '.claude', 'claudeos', 'data', 'trust-score.json');
+    if (fs.existsSync(tsFile)) return JSON.parse(fs.readFileSync(tsFile, 'utf8'));
+  } catch { /* ignore */ }
+  return { score: 0, level: 1, auto_merge_enabled: false };
+}
+
 /** Active session / project info for Boot Sequence panel */
 function getCurrentProjectInfo() {
   // Dev environment info (git)
@@ -698,28 +707,22 @@ function getCurrentProjectInfo() {
     phase = st?.phase || '—';
   } catch {}
 
-  // Trust Score: trust-score.json から実データを読み込む
-  let trust = { score: 0.0, level: 1, auto_merge_enabled: false, history: {} };
-  try {
-    const tsFile = path.join(PROJ_ROOT, '.claude', 'claudeos', 'data', 'trust-score.json');
-    if (fs.existsSync(tsFile)) {
-      const ts = JSON.parse(fs.readFileSync(tsFile, 'utf8'));
-      trust = {
-        score:             ts.score              ?? 0.0,
-        level:             ts.level              ?? 1,
-        auto_merge_enabled: ts.auto_merge_enabled ?? false,
-        history: {
-          totalCiRuns:      (ts.history || {}).total_ci_runs       ?? 0,
-          successfulCiRuns: (ts.history || {}).successful_ci_runs  ?? 0,
-          ciSuccessStreak:  (ts.history || {}).ci_success_streak   ?? 0,
-          stableAchievements: (ts.history || {}).stable_achievements ?? 0,
-          totalSessions:    (ts.history || {}).total_sessions      ?? 0,
-          blockedEvents:    (ts.history || {}).blocked_events      ?? 0,
-          lastUpdated:      (ts.history || {}).last_updated        ?? '',
-        },
-      };
-    }
-  } catch {}
+  // Trust Score: readTrustScore() 共通ヘルパーを使用
+  const _ts = readTrustScore();
+  const trust = {
+    score:             _ts.score              ?? 0.0,
+    level:             _ts.level              ?? 1,
+    auto_merge_enabled: _ts.auto_merge_enabled ?? false,
+    history: {
+      totalCiRuns:        (_ts.history || {}).total_ci_runs        ?? 0,
+      successfulCiRuns:   (_ts.history || {}).successful_ci_runs   ?? 0,
+      ciSuccessStreak:    (_ts.history || {}).ci_success_streak    ?? 0,
+      stableAchievements: (_ts.history || {}).stable_achievements  ?? 0,
+      totalSessions:      (_ts.history || {}).total_sessions       ?? 0,
+      blockedEvents:      (_ts.history || {}).blocked_events       ?? 0,
+      lastUpdated:        (_ts.history || {}).last_updated         ?? '',
+    },
+  };
 
   // Active Cron project (most recently running)
   const activeCron = getActiveCronProject();
@@ -938,6 +941,12 @@ if (require.main === module) {
     const host = req.headers.host || '';
     if (!host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
       res.writeHead(403); res.end('Forbidden'); return;
+    }
+    if (req.url === '/health' || req.url === '/api/health') {
+      const ts = readTrustScore();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ status: 'ok', uptime: Math.floor(process.uptime()), trust: ts, at: new Date().toISOString() }));
+      return;
     }
     if (req.url === '/api/data')           return handleApiData(res);
     if (req.url === '/api/mc-data')        { handleMcData(res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} }); return; }

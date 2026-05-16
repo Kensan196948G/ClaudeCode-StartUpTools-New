@@ -88,20 +88,57 @@ jobs:
           print(f"[Trust Score] outcome={outcome} score={score:.4f} level={level} streak={streak}")
           EOF
 
-      - name: Commit trust score
+      - name: Output trust score to Job Summary
         run: |
-          git config user.name  "ClaudeOS Trust Bot"
-          git config user.email "claudeos@github-actions[bot]"
-          git add .claude/claudeos/data/trust-score.json
-
           OUTCOME="${{ github.event.workflow_run.conclusion }}"
-          SCORE=$(python3 -c "import json; d=json.load(open('.claude/claudeos/data/trust-score.json')); print(d['score'])")
-          LEVEL=$(python3 -c "import json; d=json.load(open('.claude/claudeos/data/trust-score.json')); print(d['level'])")
+          python3 - <<'PYEOF'
+          import json, os
 
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "chore(trust): CI ${OUTCOME} → score=${SCORE} level=${LEVEL} [skip ci]"
-            # main はブランチ保護のため直接 push できない場合がある（fail-soft）
-            git push 2>&1 || echo "[Trust] Push blocked by branch protection; score=${SCORE} level=${LEVEL} logged only. session-end.js hook が次回セッション終了時に trust-score.json を更新します。"
-          fi
+          TRUST_FILE = ".claude/claudeos/data/trust-score.json"
+          outcome = os.environ.get("CI_OUTCOME", "unknown")
+
+          try:
+              with open(TRUST_FILE) as f:
+                  trust = json.load(f)
+          except Exception:
+              trust = {"score": 0, "level": 1, "auto_merge_enabled": False, "history": {}}
+
+          score  = trust.get("score", 0)
+          level  = trust.get("level", 1)
+          h      = trust.get("history", {})
+          streak = h.get("ci_success_streak", 0)
+          stable = h.get("stable_achievements", 0)
+          total_sess = h.get("total_sessions", 0)
+          blocked    = h.get("blocked_events", 0)
+          auto_merge = trust.get("auto_merge_enabled", False)
+
+          pct     = round(score * 100, 2)
+          lv_icon = "🟢" if level >= 3 else "🟡" if level >= 2 else "🔴"
+          bar_n   = round(score * 20)
+          bar     = "█" * bar_n + "░" * (20 - bar_n)
+
+          # GitHub Step Summary に出力
+          summary_file = os.environ.get("GITHUB_STEP_SUMMARY", "")
+          lines = [
+              "## 🛡️ Trust Ledger — CI Result",
+              "",
+              f"| 項目 | 値 |",
+              f"|---|---|",
+              f"| CI 結果 | `{outcome}` |",
+              f"| Trust Score | `[{bar}] {pct}%` |",
+              f"| Trust Level | `Level {level}` {lv_icon} |",
+              f"| Auto Merge | {'✅ 有効' if auto_merge else '⏸ 無効'} |",
+              f"| CI 連続成功 | `{streak}` 回 |",
+              f"| STABLE 達成 | `{stable}/{total_sess}` セッション |",
+              f"| Blocked 件数 | `{blocked}` 件 |",
+              "",
+              "> trust-score.json はセッション終了時に session-end.js hook が自動更新します。",
+          ]
+          if summary_file:
+              with open(summary_file, "a", encoding="utf-8") as f:
+                  f.write("\n".join(lines) + "\n")
+
+          print(f"[Trust Score] outcome={outcome} score={pct}% level={level} {lv_icon} streak={streak}")
+          PYEOF
+        env:
+          CI_OUTCOME: ${{ github.event.workflow_run.conclusion }}
