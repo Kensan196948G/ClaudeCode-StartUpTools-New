@@ -200,6 +200,19 @@ try {
       rb.saveBank(dataDir, bank);
       const sonaUpdated = bank.entries.filter(e => e.id !== entry.id).length;
       console.log(`[ReasoningBank] Saved: ${entry.id} conf=${entry.confidence.toFixed(2)} tags=[${entry.tags.join(",")}] | SONA updated ${sonaUpdated} existing entries`);
+
+      // Cross-project: グローバルバンクにも同じエントリを書き込む
+      try {
+        const globalBank = rb.loadGlobalBank();
+        rb.updateSONAWeights(globalBank, projectName, entry.tags, entry.stable_achieved);
+        rb.upsertEntry(globalBank, entry);
+        rb.pruneGlobalBank(globalBank);
+        rb.saveGlobalBank(globalBank);
+        const globalCount = globalBank.entries.length;
+        console.log(`[ReasoningBank] Global bank updated: ${globalCount} entries total`);
+      } catch (globalErr) {
+        if (process.env.CLAUDEOS_DEBUG) console.error(`[ReasoningBank] Global bank write failed: ${globalErr.message}`);
+      }
     } else {
       // 低信頼でも既存エントリの時間減衰だけは実行する
       const stateRBStab = (stateRB.stable || {});
