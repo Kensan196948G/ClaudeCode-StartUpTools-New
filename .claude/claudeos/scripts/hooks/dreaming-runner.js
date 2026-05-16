@@ -150,6 +150,13 @@ async function run() {
     defaultHeaders: { "anthropic-beta": BETA_HEADER },
   });
 
+  // SDK バージョンチェック: dreams API が存在しない場合はローカルフォールバック
+  if (!client.beta || !client.beta.dreams || typeof client.beta.dreams.create !== "function") {
+    console.log("[Dreaming] SDK に Dreams API が見つかりません (current: v0.96.0 系) → ローカル Dreaming を実行");
+    await runLocalDreaming(state, client);
+    return;
+  }
+
   try {
     const content = buildSessionContent(state);
 
@@ -265,18 +272,64 @@ async function run() {
     } catch { /* fail-soft */ }
 
   } catch (err) {
-    console.error(`[Dreaming] Error: ${err.message}`);
-    // エラーを state.dreaming.last_error に記録
-    try {
-      const s = readJson(STATE_FILE);
-      if (s) {
-        s.dreaming = s.dreaming || {};
-        s.dreaming.last_error = err.message;
-        s.dreaming.last_error_at = new Date().toISOString();
-        writeJsonAtomic(STATE_FILE, s);
-      }
-    } catch { /* ignore */ }
-    process.exit(0); // fail-soft: Stop hook をブロックしない
+    const isAccessDenied = err.message && (
+      err.message.includes("managed_agents") ||
+      err.message.includes("memoryStores") ||
+      err.message.includes("dreams") ||
+      err.message.includes("403") ||
+      err.message.includes("404")
+    );
+
+    if (isAccessDenied) {
+      console.log("[Dreaming] Managed Agents アクセス未承認 — ローカル Dreaming にフォールバック");
+      await runLocalDreaming(state, client);
+    } else {
+      console.error(`[Dreaming] Error: ${err.message}`);
+      try {
+        const s = readJson(STATE_FILE);
+        if (s) {
+          s.dreaming = s.dreaming || {};
+          s.dreaming.last_error = err.message;
+          s.dreaming.last_error_at = new Date().toISOString();
+          writeJsonAtomic(STATE_FILE, s);
+        }
+      } catch { /* ignore */ }
+    }
+    process.exit(0); // fail-soft
+  }
+}
+
+// ローカル Dreaming: 標準 Messages API でパターン分析（Managed Agents 承認待ちの代替）
+async function runLocalDreaming(state, client) {
+  try {
+    const content = buildSessionContent(state);
+    console.log("[LocalDreaming] claude-haiku-4-5 でパターン分析を実行中...");
+
+    const resp = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{
+        role: "user",
+        content: `${INSTRUCTIONS}\n\n---\n${content}`,
+      }],
+    });
+
+    const raw = (resp.content || []).map(b => b.type === "text" ? b.text : "").join("");
+    const extracted = parseExtracted(raw);
+
+    const s = readJson(STATE_FILE);
+    if (s) {
+      s.dreaming = s.dreaming || {};
+      s.dreaming.patterns           = extracted.patterns;
+      s.dreaming.curated_memories   = extracted.curated_memories;
+      s.dreaming.recurring_mistakes = extracted.recurring_mistakes;
+      s.dreaming.last_dreaming_run  = new Date().toISOString();
+      s.dreaming.mode               = "local"; // Managed Agents 承認後に "managed" に変わる
+      writeJsonAtomic(STATE_FILE, s);
+    }
+    console.log(`[LocalDreaming] 完了 — patterns:${extracted.patterns.length} memories:${extracted.curated_memories.length} mistakes:${extracted.recurring_mistakes.length}`);
+  } catch (localErr) {
+    if (process.env.CLAUDEOS_DEBUG) console.error(`[LocalDreaming] Error: ${localErr.message}`);
   }
 }
 
