@@ -1,0 +1,78 @@
+{
+  "generated_at": "2026-05-16T07:06:21.170Z",
+  "project": "ClaudeCode-StartUpTools-New",
+  "branch": "main",
+  "last_tag": "v1.7.0",
+  "configuration_items": {
+    "application": {
+      "js_ts": 57,
+      "powershell": 79,
+      "python": 4,
+      "shell": 5
+    },
+    "cicd": {
+      "workflows": 8,
+      "hooks": 15,
+      "scripts": 58
+    },
+    "config": {
+      "json": 29,
+      "yaml": 15,
+      "dotenv": 0
+    },
+    "docs": {
+      "markdown": 469,
+      "reports": 1
+    }
+  },
+  "external_dependencies": {},
+  "recent_changes": [
+    {
+      "sha": "971aac7b",
+      "message": "feat(phase6c): Dreaming 有効化 / ローカル Dreaming フォールバック実装",
+      "files": [
+        ".claude/claudeos/scripts/hooks/dreaming-runner.js"
+      ]
+    },
+    {
+      "sha": "60fc0d67",
+      "message": "feat(phase6b): GitHub Projects 自動同期スクリプト + session-end hook",
+      "files": [
+        ".claude/claudeos/scripts/hooks/session-end.js",
+        "scripts/tools/sync-github-projects.js"
+      ]
+    },
+    {
+      "sha": "b5413711",
+      "message": "fix(tdd-scan): 誤検出ルール修正 — .claude/ / scripts/tools/ / *.con",
+      "files": [
+        ".claude/claudeos/scripts/hooks/tdd-coverage-scan.js"
+      ]
+    },
+    {
+      "sha": "3bb040b9",
+      "message": "feat(phase5ab): Dashboard /health エンドポイント / pm2設定 / Trust G",
+      "files": [
+        ".github/workflows/trust-score-update.yml",
+        "Claude/templates/claudeos/workflows/trust-score-update.yml",
+        "scripts/dashboards/pm2.config.js",
+        "scripts/dashboards/serve-dashboard.js"
+      ]
+    },
+    {
+      "sha": "6dd8cf89",
+      "message": "fix(session-end): Trust Level 閾値を L2=0.75/L3=0.87 に統一",
+      "files": [
+        ".claude/claudeos/data/reasoning-bank.json",
+        ".claude/claudeos/scripts/hooks/session-end.js"
+      ]
+    }
+  ],
+  "impact_summary": {
+    "cicd": 7,
+    "config": 2,
+    "application": 0,
+    "docs": 0
+  },
+  "cmdb_agent": "ClaudeOS CMDB-Agent Phase 6D"
+}

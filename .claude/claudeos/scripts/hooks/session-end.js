@@ -104,6 +104,37 @@ try {
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] deploy-runbook skipped: ${drErr.message}`);
     }
 
+    // CMDB スキャン: Monitor フェーズ末尾で構成アイテムの差分を記録。
+    try {
+      const phase = (state.execution || {}).phase;
+      const cmdbScript = path.join(process.cwd(), "scripts", "tools", "run-cmdb-scan.js");
+      if (fs.existsSync(cmdbScript) && (phase === "Monitor" || !phase)) {
+        const { spawnSync } = require("child_process");
+        const r = spawnSync(process.execPath, [cmdbScript], { cwd: process.cwd(), encoding: "utf8", timeout: 20000 });
+        if (r.stdout) console.log(r.stdout.split("\n").slice(-3).map(l => `[CMDB] ${l}`).join("\n"));
+      }
+    } catch (cmdbErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] cmdb-scan skipped: ${cmdbErr.message}`);
+    }
+
+    // Audit スキャン: Verify フェーズ末尾で変更証跡を収集。
+    try {
+      const phase = (state.execution || {}).phase;
+      const auditScript = path.join(process.cwd(), "scripts", "tools", "run-audit-scan.js");
+      if (fs.existsSync(auditScript) && phase === "Verify") {
+        const { spawnSync } = require("child_process");
+        const r = spawnSync(process.execPath, [auditScript], { cwd: process.cwd(), encoding: "utf8", timeout: 30000 });
+        const lastLines = (r.stdout || "").split("\n").filter(Boolean).slice(-4);
+        lastLines.forEach(l => console.log(`[Audit] ${l}`));
+        if (r.status !== 0) {
+          state.warnings = state.warnings || [];
+          state.warnings.push({ at: new Date().toISOString(), kind: "audit_fail", message: "Audit スキャンで FAIL 項目が検出されました。reports/audit/ を確認してください。" });
+        }
+      }
+    } catch (auditErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] audit-scan skipped: ${auditErr.message}`);
+    }
+
     // GitHub Projects 同期: completed_issues / blocked_issues のラベルを自動更新。
     try {
       const syncScript = path.join(process.cwd(), "scripts", "tools", "sync-github-projects.js");
