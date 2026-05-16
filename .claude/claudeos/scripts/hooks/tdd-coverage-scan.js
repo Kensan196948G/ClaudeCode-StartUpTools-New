@@ -26,8 +26,17 @@ const TEST_PATTERNS = {
   ".php": (p, b) => [`${b}Test.php`, path.join("tests", `${b}Test.php`)],
 };
 
-const EXCLUDE_DIRS = ["node_modules", "vendor", ".git", "dist", "build", "out", "coverage", "reports", ".worktrees"];
-const EXCLUDE_BASENAMES = ["index", "main", "cli", "bin"];
+const EXCLUDE_DIRS = [
+  "node_modules", "vendor", ".git", "dist", "build", "out", "coverage",
+  "reports", ".worktrees",
+  // ClaudeOS インフラ（hook自体はシステム統合テストで検証するため除外）
+  ".claude",
+];
+// config ファイルパターン: *.config.js / *.config.ts は除外
+const EXCLUDE_CONFIG_SUFFIX = [".config.js", ".config.ts", ".config.mjs"];
+// ツール・スクリプト専用ディレクトリ（単体テストが存在しないことが通例）
+const EXCLUDE_TOOL_DIRS = ["scripts/tools", "scripts/setup", "scripts/release", "scripts/dashboards"];
+const EXCLUDE_BASENAMES = ["index", "main", "cli", "bin", "pm2"];
 
 function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, "utf8")); } catch { return null; }
@@ -50,6 +59,10 @@ function isExcluded(rel) {
   const parts = rel.split(/[\\/]/);
   if (parts.some(p => EXCLUDE_DIRS.includes(p))) return true;
   if (/\.test\.|\.spec\.|__tests__|_test\.go$|_spec\.rb$/.test(rel)) return true;
+  const filename = path.basename(rel);
+  if (EXCLUDE_CONFIG_SUFFIX.some(s => filename.endsWith(s))) return true;
+  const normalRel = rel.replace(/\\/g, "/");
+  if (EXCLUDE_TOOL_DIRS.some(d => normalRel.startsWith(d + "/"))) return true;
   const base = path.basename(rel, path.extname(rel));
   if (EXCLUDE_BASENAMES.includes(base)) return true;
   return false;
