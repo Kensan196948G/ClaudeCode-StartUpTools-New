@@ -150,6 +150,35 @@ try {
         state.learning.failure_patterns.unshift(entry);
         if (state.learning.failure_patterns.length > 20) state.learning.failure_patterns.length = 20;
         console.log(`[SessionEnd][Learning] failure_pattern recorded (reasons: ${reasons.join(", ")})`);
+
+        // ④ negative_patterns: Blocked が 2 回以上発生したパターンを reasoning-bank に書き込む
+        try {
+          const rbMod    = require("./reasoning-bank.js");
+          const dataDir  = path.join(__dirname, "..", "..", "data");
+          const bank     = rbMod.loadBank(dataDir);
+          const projectName = path.basename(process.cwd());
+          const negText  = reasons.join(" / ");
+          const existing = (bank.negative_patterns || []).find(
+            n => n.project === projectName && rbMod.detectProblemPattern(n.pattern) === rbMod.detectProblemPattern(negText)
+          );
+          if (existing) {
+            existing.failure_count = (existing.failure_count || 1) + 1;
+            existing.last_seen = new Date().toISOString();
+            // 2 回以上の場合は採用禁止フラグを立てる
+            if (existing.failure_count >= 2) existing.prohibited = true;
+          } else {
+            bank.negative_patterns = bank.negative_patterns || [];
+            bank.negative_patterns.push({
+              project: projectName, pattern: negText.slice(0, 150),
+              failure_count: 1, prohibited: false, last_seen: new Date().toISOString(),
+            });
+          }
+          if (bank.negative_patterns.length > 50) bank.negative_patterns = bank.negative_patterns.slice(-50);
+          rbMod.saveBank(dataDir, bank);
+          console.log(`[ReasoningBank] negative_pattern recorded: ${negText.slice(0, 60)}`);
+        } catch (negErr) {
+          if (process.env.CLAUDEOS_DEBUG) console.error(`[ReasoningBank] negative_pattern write failed: ${negErr.message}`);
+        }
       }
     } catch (learnErr) {
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] learning-record skipped: ${learnErr.message}`);
