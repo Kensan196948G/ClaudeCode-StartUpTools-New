@@ -100,5 +100,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(trust): CI ${OUTCOME} → score=${SCORE} level=${LEVEL} [skip ci]"
-            git push
+            git push 2>&1 || echo "[Trust] Push blocked by branch protection; score logged only."
           fi

@@ -102,5 +102,6 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "chore(trust): CI ${OUTCOME} → score=${SCORE} level=${LEVEL} [skip ci]"
-            git push
+            # main はブランチ保護のため直接 push できない場合がある（fail-soft）
+            git push 2>&1 || echo "[Trust] Push blocked by branch protection; score=${SCORE} level=${LEVEL} logged only. session-end.js hook が次回セッション終了時に trust-score.json を更新します。"
           fi
