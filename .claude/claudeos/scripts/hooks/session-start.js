@@ -106,23 +106,25 @@ try {
   const rb      = require("./reasoning-bank.js");
   const dataDir = path.join(__dirname, "..", "..", "data");
   const bank    = rb.loadBank(dataDir);
-  if (bank.entries.length > 0) {
-    const projectName = path.basename(process.cwd());
-    const phase       = exec.phase || "unknown";
-    const summary     = exec.last_session_summary || "";
-    const currentTags = rb.extractTags(summary);
-    const patterns    = rb.retrieveRelevantPatterns(bank, projectName, phase, currentTags, 3);
-    if (patterns.length > 0) {
-      console.log("\n[ReasoningBank] 過去の有効パターン（参考）:");
-      patterns.forEach((p, i) => {
-        const confStr = (p.confidence || 0).toFixed(2);
-        const tagsStr = (p.tags || []).slice(0, 4).join(",");
-        console.log(`  [${i + 1}] conf=${confStr} | ${p.outcome} | phase=${p.phase} | tags=[${tagsStr}]`);
-        console.log(`       問題: ${p.problem_pattern}`);
-        const approachPreview = (p.approach || "").slice(0, 120);
-        console.log(`       対応: ${approachPreview}${(p.approach || "").length > 120 ? "…" : ""}`);
-      });
-    }
+  const projectName = path.basename(process.cwd());
+  const phase       = exec.phase || "unknown";
+  const summary     = exec.last_session_summary || "";
+  const currentTags = rb.extractTags(summary);
+  // グローバルバンク（他プロジェクトのパターンも含む）から取得
+  const patterns = typeof rb.retrieveRelevantPatternsGlobal === "function"
+    ? rb.retrieveRelevantPatternsGlobal(bank, projectName, phase, currentTags, 3)
+    : rb.retrieveRelevantPatterns(bank, projectName, phase, currentTags, 3);
+  if (patterns.length > 0) {
+    console.log("\n[ReasoningBank] 過去の有効パターン（参考）:");
+    patterns.forEach((p, i) => {
+      const confStr  = (p.confidence || 0).toFixed(2);
+      const tagsStr  = (p.tags || []).slice(0, 4).join(",");
+      const crossMk  = p._cross_project ? " [cross-project]" : "";
+      console.log(`  [${i + 1}] conf=${confStr} | ${p.outcome} | phase=${p.phase} | tags=[${tagsStr}]${crossMk}`);
+      console.log(`       問題: ${p.problem_pattern}`);
+      const approachPreview = (p.approach || "").slice(0, 120);
+      console.log(`       対応: ${approachPreview}${(p.approach || "").length > 120 ? "…" : ""}`);
+    });
   }
 } catch (_rbErr) {
   // fail-soft: SessionStart フックをブロックしない

@@ -341,12 +341,13 @@ function retrieveRelevantPatternsGlobal(localBank, projectName, phase, currentTa
     .filter(e => (e.confidence || 0) >= RETRIEVE_CONF_THRESHOLD)
     .map(e => {
       let score = e.confidence;
-      if (e.project === projectName) score += 0.30;  // 同プロジェクト優先
-      else                           score += 0.10;  // 他プロジェクトも参照（小ボーナス）
-      if (e.phase === phase)         score += 0.20;
+      const isCross = e.project !== projectName;
+      if (!isCross) score += 0.30;  // 同プロジェクト優先
+      else          score += 0.10;  // 他プロジェクトも参照（小ボーナス）
+      if (e.phase === phase)        score += 0.20;
       const tagOverlap = (e.tags || []).filter(t => (currentTags || []).includes(t)).length;
       score += tagOverlap * 0.10;
-      return { entry: e, score: Math.round(score * 100) / 100 };
+      return { entry: { ...e, _cross_project: isCross }, score: Math.round(score * 100) / 100 };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, topN)
