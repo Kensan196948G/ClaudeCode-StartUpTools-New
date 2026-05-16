@@ -69,6 +69,33 @@ Read したファイルの `/goal "..."` の内容を、**そのまま Skill ツ
 > goal_type が未設定・不明の場合は、`gh issue list` と `gh run list` を確認し、
 > CTO 判断で最適な goal_type を選択してから実行すること。
 
+## 🛡️ Trust Level 確認（必須・スキップ禁止）
+
+以下を **必ず順番に実行**すること。
+
+### ステップ 1: trust-score.json を Read する
+
+```text
+.claude/claudeos/data/trust-score.json
+```
+
+### ステップ 2: trust.level に応じた許可操作範囲を確認する
+
+```text
+Level 1 (score 0.00-0.84): ファイル編集・テスト実行・Issue起票・Draft PR
+Level 2 (score 0.85-0.94): + PR作成・auto_merge（CI全通過時）
+Level 3 (score 0.95-1.00): + Staging デプロイ
+※ 本番デプロイは全 Level で人間サインオフ必須
+```
+
+### ステップ 3: エージェントメッセージを確認する
+
+```bash
+gh issue list --label "agent-msg,status:open" --limit 10
+```
+
+`priority:urgent` のメッセージは現在の作業を中断して最優先で処理すること。
+
 ## ⚡ 起動後必須実行
 
 ```bash

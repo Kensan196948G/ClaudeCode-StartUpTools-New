@@ -917,6 +917,7 @@ Agent Teams で並列に動き、Agent View で監視する。
 - セッション開始時に `trust.level` を確認し、許可操作範囲内で行動する
 - セッション終了時に `trust.history` を更新し `trust.score` を再計算する
 - Security Critical 検出時は即座に Level 1 へ降格する
+- **Blocked 発生時**: Issue に `blocked` ラベルを付与すること（GitHub Actions が `blocked_events` を自動インクリメントする）
 
 ## 23.1 Agent Communication Protocol（GitHub Issues メッセージバス）
 
