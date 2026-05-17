@@ -126,6 +126,57 @@ try {
       if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] tdd-scan skipped: ${tddErr.message}`);
     }
 
+    // Conducted mode graceful shutdown: operation_mode.current === "conducted" の場合、
+    // teammates snapshot の存在を確認し、last_snapshot_at を記録する。
+    // teammates 配列自体はリード CTO がフェーズ遷移時に書き込む（hook からは live state を取得できない）。
+    // ここでは「conducted モードで session 終了するのに teammates が空 = リード CTO が記録漏れ」を warning で検知する。
+    try {
+      const mode = (state.operation_mode || {}).current;
+      if (mode === "conducted") {
+        state.agent_teams = state.agent_teams || {};
+        if (!Array.isArray(state.agent_teams.teammates)) {
+          state.agent_teams.teammates = [];
+        }
+        state.agent_teams.last_snapshot_at = new Date().toISOString();
+
+        if (state.agent_teams.teammates.length === 0) {
+          state.warnings = state.warnings || [];
+          state.warnings.push({
+            at: new Date().toISOString(),
+            kind: "conducted_teammates_missing",
+            message: "conducted モードでセッション終了しますが agent_teams.teammates が空です。リード CTO が graceful shutdown 前に teammates の状態を state.json へ書き込んでください (conducted-mode.md §6 参照)。",
+          });
+          console.log("[SessionEnd][WARN] conducted_teammates_missing: agent_teams.teammates is empty");
+        } else {
+          const counts = state.agent_teams.teammates.reduce((acc, t) => {
+            const s = (t && t.status) || "unknown";
+            acc[s] = (acc[s] || 0) + 1;
+            return acc;
+          }, {});
+          const summary = Object.entries(counts).map(([k, v]) => `${k}=${v}`).join(" ");
+          console.log(`[SessionEnd] conducted mode snapshot: ${state.agent_teams.teammates.length} teammates (${summary})`);
+
+          // 未完了 teammate が残ったまま終了する場合は warning。
+          const unfinished = state.agent_teams.teammates.filter(t => {
+            const s = (t && t.status) || "";
+            return s === "working" || s === "needs_input";
+          });
+          if (unfinished.length > 0) {
+            state.warnings = state.warnings || [];
+            state.warnings.push({
+              at: new Date().toISOString(),
+              kind: "conducted_teammates_unfinished",
+              message: `${unfinished.length} 個の teammate が working / needs_input のままセッション終了します。次セッションで spawn 計画から復元してください (teammates 自体は resume 不可)。`,
+              roles: unfinished.map(t => t.role).filter(Boolean),
+            });
+            console.log(`[SessionEnd][WARN] conducted_teammates_unfinished: ${unfinished.length} teammate(s) still working/needs_input`);
+          }
+        }
+      }
+    } catch (ctErr) {
+      if (process.env.CLAUDEOS_DEBUG) console.error(`[SessionEnd] conducted-snapshot skipped: ${ctErr.message}`);
+    }
+
     writeJsonAtomic(STATE_FILE, state);
     console.log("[SessionEnd] state.json updated (last_stop_at recorded)");
 
