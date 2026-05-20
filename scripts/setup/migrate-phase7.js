@@ -75,44 +75,11 @@ function expandUserPath(p) {
   return p.replace(/^%USERPROFILE%/i, process.env.USERPROFILE || process.env.HOME || "");
 }
 
-function loadRegisteredProjects(configPath) {
-  // Discovery 戦略:
-  // 1. config/config.json から projectsDir と recentProjects.historyFile を読む
-  // 2. recent-projects.json から project name のリストを取得
-  // 3. projectsDir + name でパスを構築
-  // 4. .mcp.json を持つプロジェクトのみ対象とする
-  const cfgPath = configPath || path.join(process.cwd(), "config", "config.json");
-  if (!fs.existsSync(cfgPath)) {
-    console.error(`WARN: ${cfgPath} not found. No projects to migrate.`);
-    return [];
-  }
-  let cfg;
-  try {
-    cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
-  } catch (e) {
-    console.error(`ERROR: failed to parse ${cfgPath}: ${e.message}`);
-    process.exit(3);
-  }
-
+function discoverProjectsFromWindowsConfig(cfg) {
+  // Windows: config/config.json + recent-projects.json + projectsDir scan
   const projectsDir = cfg.projectsDir;
   if (!projectsDir) {
     console.error("ERROR: config.json has no projectsDir");
-    return [];
-  }
-
-  const historyFile = expandUserPath(
-    (cfg.recentProjects && cfg.recentProjects.historyFile) || ""
-  );
-  if (!historyFile || !fs.existsSync(historyFile)) {
-    console.error(`WARN: recent-projects.json not found at ${historyFile}`);
-    return [];
-  }
-
-  let history;
-  try {
-    history = JSON.parse(fs.readFileSync(historyFile, "utf8"));
-  } catch (e) {
-    console.error(`ERROR: failed to parse ${historyFile}: ${e.message}`);
     return [];
   }
 
@@ -120,17 +87,26 @@ function loadRegisteredProjects(configPath) {
   const projects = [];
 
   // Strategy A: recent-projects.json から名前を取り projectsDir 配下を確認
-  for (const entry of history.projects || []) {
-    if (!entry.project || seen.has(entry.project)) continue;
-    seen.add(entry.project);
-    const projectPath = path.join(projectsDir, entry.project);
-    if (!fs.existsSync(projectPath)) continue;
-    if (!fs.existsSync(path.join(projectPath, ".mcp.json"))) continue;
-    projects.push({ name: entry.project, path: projectPath });
+  const historyFile = expandUserPath(
+    (cfg.recentProjects && cfg.recentProjects.historyFile) || ""
+  );
+  if (historyFile && fs.existsSync(historyFile)) {
+    try {
+      const history = JSON.parse(fs.readFileSync(historyFile, "utf8"));
+      for (const entry of history.projects || []) {
+        if (!entry.project || seen.has(entry.project)) continue;
+        seen.add(entry.project);
+        const projectPath = path.join(projectsDir, entry.project);
+        if (!fs.existsSync(projectPath)) continue;
+        if (!fs.existsSync(path.join(projectPath, ".mcp.json"))) continue;
+        projects.push({ name: entry.project, path: projectPath, _source: "recent" });
+      }
+    } catch (e) {
+      console.error(`WARN: failed to parse ${historyFile}: ${e.message}`);
+    }
   }
 
-  // Strategy B (fallback): projectsDir 直下を scan し、.mcp.json を持つ
-  // ディレクトリを追加する (Strategy A で見つからなかったローカルプロジェクト用)
+  // Strategy B (fallback): projectsDir 直下を scan
   try {
     const entries = fs.readdirSync(projectsDir, { withFileTypes: true });
     for (const e of entries) {
@@ -148,6 +124,89 @@ function loadRegisteredProjects(configPath) {
   }
 
   return projects;
+}
+
+function discoverProjectsFromLinuxConfig(cfg) {
+  // Linux: config/linux-projects.json with basePath + projects array
+  const basePath = cfg.basePath;
+  if (!basePath) {
+    console.error("ERROR: linux-projects.json has no basePath");
+    return [];
+  }
+
+  const seen = new Set();
+  const projects = [];
+
+  // Strategy A: linux-projects.json の projects 配列から名前を取得
+  for (const name of cfg.projects || []) {
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const projectPath = path.join(basePath, name);
+    if (!fs.existsSync(projectPath)) continue;
+    if (!fs.existsSync(path.join(projectPath, ".mcp.json"))) continue;
+    projects.push({ name, path: projectPath, _source: "linux-registry" });
+  }
+
+  // Strategy B (fallback): basePath 直下も scan
+  try {
+    const entries = fs.readdirSync(basePath, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      if (seen.has(e.name)) continue;
+      const projectPath = path.join(basePath, e.name);
+      if (!fs.existsSync(path.join(projectPath, ".mcp.json"))) continue;
+      seen.add(e.name);
+      projects.push({ name: e.name, path: projectPath, _source: "scan" });
+    }
+  } catch (e) {
+    if (process.env.MIGRATE_PHASE7_DEBUG) {
+      console.error(`[debug] scan ${basePath} failed: ${e.message}`);
+    }
+  }
+
+  return projects;
+}
+
+function loadRegisteredProjects(configPath) {
+  // Auto-detect: try explicit --config, then Windows config.json, then Linux linux-projects.json
+  const candidates = configPath
+    ? [configPath]
+    : [
+        path.join(process.cwd(), "config", "config.json"),
+        path.join(process.cwd(), "config", "linux-projects.json"),
+      ];
+
+  let cfgPath = null;
+  for (const c of candidates) {
+    if (fs.existsSync(c)) { cfgPath = c; break; }
+  }
+
+  if (!cfgPath) {
+    console.error(`WARN: no config file found. Tried: ${candidates.join(", ")}`);
+    return [];
+  }
+
+  let cfg;
+  try {
+    cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8"));
+  } catch (e) {
+    console.error(`ERROR: failed to parse ${cfgPath}: ${e.message}`);
+    process.exit(3);
+  }
+
+  console.log(`[discovery] using config: ${cfgPath}`);
+
+  // Format detection: linux-projects.json has "basePath" + "projects" array
+  // Windows config.json has "projectsDir" + "recentProjects"
+  if (cfg.basePath && Array.isArray(cfg.projects)) {
+    return discoverProjectsFromLinuxConfig(cfg);
+  }
+  if (cfg.projectsDir) {
+    return discoverProjectsFromWindowsConfig(cfg);
+  }
+
+  console.error(`ERROR: ${cfgPath} has neither basePath+projects (Linux) nor projectsDir (Windows)`);
+  return [];
 }
 
 function loadMcp(projectPath) {
