@@ -698,6 +698,22 @@ skip_if 条件が真の項目のみスキップ可。スキップした場合は
 - 主要回帰（#1・#22・#31・#51・#71・#111・#131・#141・#231〜#241）を必ず含める
 - 未実行項目は「未実行理由」を終了報告に記載する（記載なしは merge 禁止）
 
+### Gate-2b: ultrareview (Phase 7C+ / Trust Level 2+ の PR 必須)
+
+PR 作成直後・merge 直前に `node scripts/tools/run-ultrareview.js --target <PR#>` を実行し、
+Claude Code 公式の multi-agent cloud review を行う。
+
+| 適用条件 | 内容 |
+|---|---|
+| Trust Level | 2 以上 |
+| 適用範囲 | open PR (本番 deploy 前必須) |
+| 月次上限 | `state.feature_flags.ultrareview.monthly_cap` で制御 (default 50/月) |
+| 結果保存 | `reports/ultrareview/YYYY-MM-DD.json` |
+| 重大度判定 | critical / high / blocker → `state.warnings[].kind="ultrareview_blocker"` 自動追記 |
+
+**重要**: ultrareview はクラウド処理 (課金対象、最大 30 分)。session-end hook での同期呼び出しは禁止
+(session 終了が大幅遅延する)。手動 / cron / 別 PR で非同期統合する設計とする。
+
 ### Verify フェーズ標準参加 Agent（全登録プロジェクト共通）
 
 `e2e-runner` と `security-reviewer` を全プロジェクトの Verify フェーズ必須参加 Agent とする。
