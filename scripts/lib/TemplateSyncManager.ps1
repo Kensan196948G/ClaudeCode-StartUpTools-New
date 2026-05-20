@@ -224,6 +224,13 @@ function Sync-LauncherClaudeGlobalConfig {
         -TargetPath (Join-Path $ProjectDir '.claude\statusline.py') `
         -Label '.claude/statusline.py' `
         -EnsureParentDirectory
+
+    # Phase 7D: scripts/tools/ 配下のテンプレを各プロジェクトへ配布。
+    # 現状は run-ultrareview.js のみ。他の tools 配布は別 PR で都度追加する。
+    Sync-ProjectTemplateDirectory `
+        -TemplateDir (Join-Path $StartupRoot 'Claude\templates\claudeos\scripts\tools') `
+        -TargetDir (Join-Path $ProjectDir 'scripts\tools') `
+        -Label 'scripts/tools'
 }
 
 <#

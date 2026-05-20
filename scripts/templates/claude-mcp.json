@@ -1,6 +1,7 @@
 {
   "mcpServers": {
     "github": {
+      "alwaysLoad": true,
       "command": "npx",
       "args": ["-y", "@anthropic/mcp-server-github"],
       "env": {
@@ -8,6 +9,7 @@
       }
     },
     "memory": {
+      "alwaysLoad": true,
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-memory"],
       "env": {
@@ -19,6 +21,7 @@
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
     },
     "context7": {
+      "alwaysLoad": true,
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
       "env": {

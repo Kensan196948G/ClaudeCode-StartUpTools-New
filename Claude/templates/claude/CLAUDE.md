@@ -512,6 +512,22 @@ STABLE 未達は merge / deploy 禁止。
 
 CI が未整備なら、未整備であることを先に記録する。
 
+### Gate-2b: ultrareview (Phase 7C+ / Trust Level 2+ の PR 必須)
+
+PR 作成直後・merge 直前に `node scripts/tools/run-ultrareview.js --target <PR#>` を実行し、
+Claude Code 公式の multi-agent cloud review を行う。
+
+| 適用条件 | 内容 |
+|---|---|
+| Trust Level | 2 以上 |
+| 適用範囲 | open PR (本番 deploy 前必須) |
+| 月次上限 | `state.feature_flags.ultrareview.monthly_cap` で制御 (default 50/月) |
+| 結果保存 | `reports/ultrareview/YYYY-MM-DD.json` |
+| 重大度判定 | critical / high / blocker → `state.warnings[].kind="ultrareview_blocker"` 自動追記 |
+
+**重要**: ultrareview はクラウド処理 (課金対象、最大 30 分)。session-end hook での同期呼び出しは禁止
+(session 終了が大幅遅延する)。手動 / cron / 別 PR で非同期統合する設計とする。
+
 ## 12. Auto Repair 制御 / Stop Conditions（CI Manager）
 
 **Stop Conditions（強制停止）:**
