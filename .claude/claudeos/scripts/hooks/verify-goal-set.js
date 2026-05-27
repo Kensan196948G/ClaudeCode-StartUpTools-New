@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // SessionStart hook (ClaudeOS v9.0)
-// START_PROMPT.md ステップ A の /goal 本文を抽出し、ユーザーが手動入力する形で提示する。
+// START_PROMPT.md の冒頭 /goal 本文を抽出し、テンプレ整合性チェックと
+// 手動 claude 起動時のコピー元として提示する。
 //
-// 重要: /goal は Claude Code の UI コマンドであり、Claude (Skill ツール) からは実行不可。
-//       ユーザーが対話プロンプトに直接 /goal "..." と打ち込む必要がある。
+// 重要な背景:
+// - 通常運用 (start.bat → Start-ClaudeCode.ps1 経由): START_PROMPT.md 全文が
+//   `& claude @args` で claude に渡され、冒頭 /goal は Claude Code UI が
+//   自動実行する。ユーザーは何もしなくてよい。
+// - 手動運用 (`claude` を直接起動): START_PROMPT.md は使われないため、
+//   このリマインダがユーザーへのコピー元として機能する。
 //
 // 設計方針:
-//  - START_PROMPT.md から /goal "..." 行を機械的に抽出して画面に提示することで、
-//    ユーザーが正本テキストをワンクリックでコピーできる状態を作る。
-//  - 必須キーワードの整合性も同時にチェックし、テンプレ側の劣化を検出する。
-//  - hook は Claude にも見える形で stdout に出力するため、Claude は「ユーザーに
-//    /goal 提示が必要な場合」を判断する材料として活用できる。
+//  - START_PROMPT.md から /goal "..." 行を機械的に抽出して画面に提示
+//  - 必須キーワード整合性をチェックし、テンプレ側の劣化を検出
+//  - hook 出力は Claude にも見えるため、Claude は /goal の現在内容を把握できる
+//  - /goal の実行自体は Skill ツール経由不可 (UI コマンド仕様)
 
 const fs = require("fs");
 const path = require("path");
@@ -41,28 +45,40 @@ function findStartPrompt() {
 }
 
 function extractGoalLine(content) {
-  // フェンス付きコードブロック内の /goal "..." を抽出する
-  // プロローグに含まれる /goal "..." プレースホルダ（説明文中の参照）は除外
+  // 優先 1: ファイル冒頭が /goal "..." で始まる場合（自動実行用の正規形式）
+  // 優先 2: フェンス付きコードブロック内の /goal "..."（後方互換）
+  // 短すぎる "..." プレースホルダは除外。
+  function tryExtractFrom(text, startIdx) {
+    let i = startIdx + '/goal "'.length;
+    let escaped = false;
+    while (i < text.length) {
+      const c = text[i];
+      if (escaped) { escaped = false; i++; continue; }
+      if (c === '\\') { escaped = true; i++; continue; }
+      if (c === '"') {
+        const candidate = text.slice(startIdx, i + 1);
+        return candidate.length > 20 ? candidate : null;
+      }
+      i++;
+    }
+    return null;
+  }
+
+  // 優先 1: 冒頭の /goal "..." (Start-ClaudeCode.ps1 経由で自動実行される位置)
+  if (content.startsWith('/goal "')) {
+    const result = tryExtractFrom(content, 0);
+    if (result) return result;
+  }
+
+  // 優先 2: フェンス付きコードブロック内 (旧形式の後方互換)
   const fenceRe = /```[a-zA-Z]*\r?\n([\s\S]*?)```/g;
   let m;
   while ((m = fenceRe.exec(content)) !== null) {
     const block = m[1];
     const idx = block.indexOf('/goal "');
     if (idx < 0) continue;
-    let i = idx + '/goal "'.length;
-    let escaped = false;
-    while (i < block.length) {
-      const c = block[i];
-      if (escaped) { escaped = false; i++; continue; }
-      if (c === '\\') { escaped = true; i++; continue; }
-      if (c === '"') {
-        // プレースホルダ "..." は短すぎるのでスキップ
-        const candidate = block.slice(idx, i + 1);
-        if (candidate.length > 20) return candidate;
-        break;
-      }
-      i++;
-    }
+    const result = tryExtractFrom(block, idx);
+    if (result) return result;
   }
   return null;
 }
@@ -90,15 +106,14 @@ if (!goalLine) {
 
 const missing = REQUIRED_KEYWORDS.filter((kw) => !goalLine.includes(kw));
 
-console.log("[verify-goal-set] 🔒 START_PROMPT.md ステップ A — /goal コピー＆実行リマインダ");
+console.log("[verify-goal-set] 🔒 START_PROMPT.md 整合性チェック + /goal 本文プレビュー");
 console.log("");
-console.log("  ⚠️ /goal は UI コマンドのため Claude (Skill ツール) からは実行不可。");
-console.log("     ユーザーが対話プロンプトに以下を **一字一句変えず** 入力してください:");
+console.log("  start.bat 経由起動時: 冒頭 /goal は Claude Code 本体が自動実行します。");
+console.log("  手動 claude 起動時:   以下を対話プロンプトにコピー＆Enter してください:");
 console.log("");
-console.log("  ───────── BEGIN VERBATIM /goal ─────────");
-// 改行を保ち、各行に2スペースインデントを付けて見やすく表示
+console.log("  ───────── /goal (canonical) ─────────");
 goalLine.split(/\r?\n/).forEach((line) => console.log(`  ${line}`));
-console.log("  ─────────  END VERBATIM /goal  ─────────");
+console.log("  ─────────  END  /goal  ─────────");
 console.log("");
 
 if (missing.length > 0) {
@@ -109,8 +124,7 @@ if (missing.length > 0) {
 }
 
 console.log("");
-console.log("  禁止: 要約・短縮・整形 (コピペ前提)。");
-console.log("  Claude は「以下の /goal をご自身で実行してください」とユーザーに案内し、");
-console.log("  ユーザー入力を待たずに次のステップ (ClaudeOS ファイル Read) へ進むこと。");
+console.log("  Note: /goal は Claude Code UI コマンドのため Skill ツールから実行不可。");
+console.log("        Claude は本リマインダを参考に /goal の現在内容を把握できる。");
 
 process.exit(0);

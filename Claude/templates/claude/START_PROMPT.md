@@ -1,26 +1,14 @@
+/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
+
 # 🚀 ClaudeOS Boot Loader v9.0
 
-## 🔒 ステップ A: /goal を **ユーザーに提示**（最優先・改変禁止）
-
-> ⚠️ `/goal` は Claude Code の **UI コマンド**であり、Claude (Skill ツール) からは実行できません。
-> 以下のコードブロックの内容を **そのままユーザーに提示**し、ユーザー自身に対話プロンプトへ入力してもらってください。
-
-Claude は以下のように案内すること:
-> 「セッション開始のため、以下の `/goal` をご自身で実行してください」
-> （その後、下記のコードブロックをそのまま表示）
-
-ユーザー入力を**待たずに**ステップ B 以降の作業に進んで構いません (/goal は会話途中で入力されてもセッション全体に適用されます)。
-
-**禁止事項（違反した場合は再提示）:**
-- ❌ 文面の要約・短縮・整形 (コピペ前提)
-- ❌ 改行位置・句読点の変更
-- ❌ Skill ツール経由で `/goal` を実行しようとすること (UI 専用コマンドのため失敗します)
-
-```text
-/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
-```
-
-> ℹ️ SessionStart hook (`verify-goal-set.js`) がこの /goal 本文を自動的に画面提示し、必須キーワード（CTO全権委任 / Monitor / Verify / AgentTeams / 5時間 / README / GitHub Projects / stop after）の存在を検証します。テンプレ劣化時は警告が出るので、その場合は本ブロックを修正してください。
+> 🔒 **冒頭 1 行目の `/goal "..."` は Claude Code 本体が UI コマンドとして自動処理します。**
+> このファイル全文が `Start-ClaudeCode.ps1` から `& claude` の起動引数として渡されるため、
+> 冒頭の `/goal` は Claude の Skill ツール経由ではなく、Claude Code UI が直接受信し実行します。
+> **冒頭行を改変・移動しないでください。** (改変すると自動実行が破綻します)
+>
+> SessionStart hook (`verify-goal-set.js`) はテンプレ劣化検出と手動 claude 起動時の
+> コピー元として機能します (必須キーワード 8 個整合をチェック)。
 
 ## 📚 ステップ B: ClaudeOS ファイルを順に Read する
 
@@ -56,7 +44,7 @@ claudeos/governance/20-audit-policy.md
 
 ## 🎯 ステップ C: goal_type 別ファイル Read（補助）
 
-ステップ A の /goal は CTO 全権委任版（汎用）。`state.goal_type` が設定済みの場合は対応ファイルを追加 Read すること。
+冒頭の /goal は CTO 全権委任版（汎用）。`state.goal_type` が設定済みの場合は対応ファイルを追加 Read すること。
 
 ```bash
 cat state.json | grep goal_type
@@ -70,7 +58,7 @@ security-emergency → claudeos/goals/security-emergency.md
 refactoring        → claudeos/goals/refactoring.md
 ```
 
-> goal_type が未設定・不明の場合は、ステップ A の汎用 /goal で進めること。追加 Read は不要。
+> goal_type が未設定・不明の場合は、冒頭の汎用 /goal で進めること。追加 Read は不要。
 
 ## 🛡️ ステップ D: Trust Level 確認（必須）
 
@@ -105,7 +93,7 @@ claude agents
 
 ## 🔥 最上位原則
 
-- Goal Driven（ステップ A の /goal が全行動の基準）
+- Goal Driven（冒頭の /goal が全行動の基準）
 - Security First
 - Verify Mandatory
 - Stop Infinite Repair
