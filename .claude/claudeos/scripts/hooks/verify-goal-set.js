@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 // SessionStart hook (ClaudeOS v9.0)
-// START_PROMPT.md ステップ A の /goal 本文を抽出し、Claude に逐語実行を促す。
+// START_PROMPT.md ステップ A の /goal 本文を抽出し、ユーザーが手動入力する形で提示する。
+//
+// 重要: /goal は Claude Code の UI コマンドであり、Claude (Skill ツール) からは実行不可。
+//       ユーザーが対話プロンプトに直接 /goal "..." と打ち込む必要がある。
 //
 // 設計方針:
-//  - Claude Code 公式 /goal は runtime 内で管理され state.json に書き込まれないため
-//    「事後検証」ではなく「事前注入」方式を採用する。
-//  - START_PROMPT.md から /goal "..." 行を機械的に抽出して提示することで、
-//    Claude が逐語コピーすべき文字列を session 開始時に必ず目にする状態を作る。
+//  - START_PROMPT.md から /goal "..." 行を機械的に抽出して画面に提示することで、
+//    ユーザーが正本テキストをワンクリックでコピーできる状態を作る。
 //  - 必須キーワードの整合性も同時にチェックし、テンプレ側の劣化を検出する。
+//  - hook は Claude にも見える形で stdout に出力するため、Claude は「ユーザーに
+//    /goal 提示が必要な場合」を判断する材料として活用できる。
 
 const fs = require("fs");
 const path = require("path");
@@ -87,9 +90,10 @@ if (!goalLine) {
 
 const missing = REQUIRED_KEYWORDS.filter((kw) => !goalLine.includes(kw));
 
-console.log("[verify-goal-set] 🔒 START_PROMPT.md ステップ A — /goal 逐語実行リマインダ");
+console.log("[verify-goal-set] 🔒 START_PROMPT.md ステップ A — /goal コピー＆実行リマインダ");
 console.log("");
-console.log("  以下の文字列を **一字一句変えず** Skill ツール経由で即時実行すること:");
+console.log("  ⚠️ /goal は UI コマンドのため Claude (Skill ツール) からは実行不可。");
+console.log("     ユーザーが対話プロンプトに以下を **一字一句変えず** 入力してください:");
 console.log("");
 console.log("  ───────── BEGIN VERBATIM /goal ─────────");
 // 改行を保ち、各行に2スペースインデントを付けて見やすく表示
@@ -105,7 +109,8 @@ if (missing.length > 0) {
 }
 
 console.log("");
-console.log("  禁止: 要約・短縮・整形・前置き宣言。");
-console.log("  実行後、ステップ B (ClaudeOS ファイル Read) へ進むこと。");
+console.log("  禁止: 要約・短縮・整形 (コピペ前提)。");
+console.log("  Claude は「以下の /goal をご自身で実行してください」とユーザーに案内し、");
+console.log("  ユーザー入力を待たずに次のステップ (ClaudeOS ファイル Read) へ進むこと。");
 
 process.exit(0);
