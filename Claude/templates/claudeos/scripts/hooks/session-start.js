@@ -77,6 +77,37 @@ if (wp) {
   console.log(`  week_phase: Week ${wp.week} → ${wp.phase} (${wp.focus})`);
 }
 
+// v9.0+: Agent Teams 推奨パターン提示
+//   フェーズに応じた CTO 判断の指針を提示する（強制ではない）
+function recommendPattern(phase) {
+  const p = (phase || "").toLowerCase();
+  if (p.includes("build") || p.includes("development")) {
+    return { pattern: "A", desc: "並列実装 (Backend + Frontend + テスト)" };
+  }
+  if (p.includes("verify") || p.includes("quality") || p.includes("repair")) {
+    return { pattern: "B", desc: "品質強化 (バグ修復 + Security + 回帰)" };
+  }
+  if (p.includes("monitor") || p.includes("research") || p.includes("design")) {
+    return { pattern: "C", desc: "調査・設計 (技術調査 + 設計 + Devil's Advocate)" };
+  }
+  return null;
+}
+const rec = recommendPattern(exec.phase);
+if (rec) {
+  console.log(`  agent_teams_recommended: パターン ${rec.pattern} — ${rec.desc}`);
+}
+
+// Agent Teams 直近使用状況サマリ
+const atu = state.agent_teams_usage || {};
+const atuCur = atu.current_session || {};
+if (atuCur.team_create_count || atuCur.send_message_count) {
+  console.log(`  agent_teams_current: TeamCreate=${atuCur.team_create_count || 0} SendMessage=${atuCur.send_message_count || 0} patterns=[${(atuCur.patterns_used || []).join(",")}]`);
+}
+
+// Dashboard URL 案内（Agent View 代替）
+const dashPort = process.env.CLAUDEOS_DASHBOARD_PORT || "3737";
+console.log(`  dashboard: http://localhost:${dashPort}/mission-control (Agent Teams Activity パネル参照)`);
+
 // state.json に current_session_start_at を書き込む
 try {
   const now = new Date().toISOString();
@@ -106,23 +137,25 @@ try {
   const rb      = require("./reasoning-bank.js");
   const dataDir = path.join(__dirname, "..", "..", "data");
   const bank    = rb.loadBank(dataDir);
-  if (bank.entries.length > 0) {
-    const projectName = path.basename(process.cwd());
-    const phase       = exec.phase || "unknown";
-    const summary     = exec.last_session_summary || "";
-    const currentTags = rb.extractTags(summary);
-    const patterns    = rb.retrieveRelevantPatterns(bank, projectName, phase, currentTags, 3);
-    if (patterns.length > 0) {
-      console.log("\n[ReasoningBank] 過去の有効パターン（参考）:");
-      patterns.forEach((p, i) => {
-        const confStr = (p.confidence || 0).toFixed(2);
-        const tagsStr = (p.tags || []).slice(0, 4).join(",");
-        console.log(`  [${i + 1}] conf=${confStr} | ${p.outcome} | phase=${p.phase} | tags=[${tagsStr}]`);
-        console.log(`       問題: ${p.problem_pattern}`);
-        const approachPreview = (p.approach || "").slice(0, 120);
-        console.log(`       対応: ${approachPreview}${(p.approach || "").length > 120 ? "…" : ""}`);
-      });
-    }
+  const projectName = path.basename(process.cwd());
+  const phase       = exec.phase || "unknown";
+  const summary     = exec.last_session_summary || "";
+  const currentTags = rb.extractTags(summary);
+  // グローバルバンク（他プロジェクトのパターンも含む）から取得
+  const patterns = typeof rb.retrieveRelevantPatternsGlobal === "function"
+    ? rb.retrieveRelevantPatternsGlobal(bank, projectName, phase, currentTags, 3)
+    : rb.retrieveRelevantPatterns(bank, projectName, phase, currentTags, 3);
+  if (patterns.length > 0) {
+    console.log("\n[ReasoningBank] 過去の有効パターン（参考）:");
+    patterns.forEach((p, i) => {
+      const confStr  = (p.confidence || 0).toFixed(2);
+      const tagsStr  = (p.tags || []).slice(0, 4).join(",");
+      const crossMk  = p._cross_project ? " [cross-project]" : "";
+      console.log(`  [${i + 1}] conf=${confStr} | ${p.outcome} | phase=${p.phase} | tags=[${tagsStr}]${crossMk}`);
+      console.log(`       問題: ${p.problem_pattern}`);
+      const approachPreview = (p.approach || "").slice(0, 120);
+      console.log(`       対応: ${approachPreview}${(p.approach || "").length > 120 ? "…" : ""}`);
+    });
   }
 } catch (_rbErr) {
   // fail-soft: SessionStart フックをブロックしない
