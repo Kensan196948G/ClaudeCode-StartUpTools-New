@@ -77,6 +77,37 @@ if (wp) {
   console.log(`  week_phase: Week ${wp.week} → ${wp.phase} (${wp.focus})`);
 }
 
+// v9.0+: Agent Teams 推奨パターン提示
+//   フェーズに応じた CTO 判断の指針を提示する（強制ではない）
+function recommendPattern(phase) {
+  const p = (phase || "").toLowerCase();
+  if (p.includes("build") || p.includes("development")) {
+    return { pattern: "A", desc: "並列実装 (Backend + Frontend + テスト)" };
+  }
+  if (p.includes("verify") || p.includes("quality") || p.includes("repair")) {
+    return { pattern: "B", desc: "品質強化 (バグ修復 + Security + 回帰)" };
+  }
+  if (p.includes("monitor") || p.includes("research") || p.includes("design")) {
+    return { pattern: "C", desc: "調査・設計 (技術調査 + 設計 + Devil's Advocate)" };
+  }
+  return null;
+}
+const rec = recommendPattern(exec.phase);
+if (rec) {
+  console.log(`  agent_teams_recommended: パターン ${rec.pattern} — ${rec.desc}`);
+}
+
+// Agent Teams 直近使用状況サマリ
+const atu = state.agent_teams_usage || {};
+const atuCur = atu.current_session || {};
+if (atuCur.team_create_count || atuCur.send_message_count) {
+  console.log(`  agent_teams_current: TeamCreate=${atuCur.team_create_count || 0} SendMessage=${atuCur.send_message_count || 0} patterns=[${(atuCur.patterns_used || []).join(",")}]`);
+}
+
+// Dashboard URL 案内（Agent View 代替）
+const dashPort = process.env.CLAUDEOS_DASHBOARD_PORT || "3737";
+console.log(`  dashboard: http://localhost:${dashPort}/mission-control (Agent Teams Activity パネル参照)`);
+
 // state.json に current_session_start_at を書き込む
 try {
   const now = new Date().toISOString();

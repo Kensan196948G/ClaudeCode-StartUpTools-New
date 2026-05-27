@@ -273,8 +273,9 @@ function Show-Menu {
         "11  🏛️  Architecture Check",
         "12  📊 Statusline 設定",
         "13  📡 Claude ログ監視タブを開く",
+        "16  🤝 Agent Teams Status (CLI 表示)",
         "D   🌐 Projects Dashboard (進捗 WebUI)",
-        "MC  🎛️  Mission Control (統合管理コンソール)",
+        "MC  🎛️  Mission Control (統合管理 / Agent Teams 計測)",
         "DR  📌 Dashboard をタスクスケジューラーに登録（自動起動）",
         "DU  🗑️  Dashboard タスクを解除"
     ) | ForEach-Object { Write-Host "    $_" -ForegroundColor Magenta }
@@ -423,6 +424,18 @@ while ($true) {
         }
         "DR" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-RunNow') }
         "DU" { Invoke-MenuScript -File "scripts\main\Register-DashboardTask.ps1" -ScriptArgs @('-Unregister') }
+        "16" {
+            $statusScript = Join-Path $ProjectRoot "scripts\tools\agent-teams-status.js"
+            if (Test-Path $statusScript) {
+                Push-Location $ProjectRoot
+                try { & node $statusScript }
+                finally { Pop-Location }
+            } else {
+                Write-Host "  [ERROR] agent-teams-status.js not found: $statusScript" -ForegroundColor Red
+            }
+            Write-Host ""
+            Read-Host "  Enterキーでメニューに戻ります"
+        }
         "15" {
             $watchScript = Join-Path $ProjectRoot "scripts\tools\Watch-SessionInfoSSH.ps1"
             & $ShellExe -NoProfile -ExecutionPolicy Bypass -File $watchScript

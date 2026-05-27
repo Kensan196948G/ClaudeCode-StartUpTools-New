@@ -902,9 +902,11 @@ window.DashboardPanel = DashboardPanel;
        BLOCK 5: Agent Teams Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const AgentsPanel = ({ state, liveData }) => {
+const AgentsPanel = ({ state, liveData, agentTeamsActivity }) => {
   const [selectedAgent, setSelectedAgent] = React.useState(null);
   const [teamPattern, setTeamPattern] = React.useState("A");
+  // Agent Teams Activity (TeamCreate/SendMessage 計測値) — hook 未稼働時は null
+  const ata = (agentTeamsActivity && agentTeamsActivity.available) ? agentTeamsActivity : null;
   // liveData.agentTeams があれば実データを優先、なければモック
   const agents = (liveData?.agentTeams?.length ? liveData.agentTeams : null) || window.AGENTS_DATA;
   const statusCounts = { working:0, idle:0, completed:0 };
@@ -929,6 +931,36 @@ const AgentsPanel = ({ state, liveData }) => {
             {teamPattern==="A" ? "並列実装" : teamPattern==="B" ? "品質強化" : "調査・設計"}
           </span>
         </div>
+      </div>
+      {/* Agent Teams Activity — agent-teams-tracker.js hook 由来の計測値 */}
+      <div style={{ gridColumn:"1 / -1", background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, padding:"10px 14px", display:"flex", alignItems:"center", gap:16, flexWrap:"wrap" }}>
+        <span style={{ fontSize:11, color:MC.textDim, fontWeight:600 }}>📊 Agent Teams Activity</span>
+        {ata ? (
+          <>
+            <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>
+              TeamCreate: <b style={{ fontSize:13 }}>{ata.current.team_create_count}</b>
+            </span>
+            <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.accent }}>
+              SendMessage: <b style={{ fontSize:13 }}>{ata.current.send_message_count}</b>
+            </span>
+            <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.textMuted }}>
+              現セッション patterns: [{(ata.current.patterns_used || []).join(",") || "—"}]
+            </span>
+            <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.textMuted }}>
+              直近 7日: A={ata.last_7days.pattern_count.A} B={ata.last_7days.pattern_count.B} C={ata.last_7days.pattern_count.C}
+              （{ata.last_7days.sessions_with_teams} sessions）
+            </span>
+            {ata.current.last_activity_at && (
+              <span style={{ fontSize:10, color:MC.textMuted, marginLeft:"auto" }}>
+                最終: {new Date(ata.current.last_activity_at).toLocaleTimeString('ja-JP')}
+              </span>
+            )}
+          </>
+        ) : (
+          <span style={{ fontSize:11, color:MC.textMuted }}>
+            計測データなし — agent-teams-tracker.js hook 起動後に表示されます
+          </span>
+        )}
       </div>
       <Panel title="エージェント一覧" icon="👥" noPad>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:1, background:MC.border }}>
@@ -1751,6 +1783,8 @@ const App = () => {
   // liveData: 30秒ごとに /api/mc-data から取得した実データ
   const [liveData, setLiveData] = React.useState(null);
   const [lastUpdated, setLastUpdated] = React.useState(null);
+  // agentTeamsActivity: state.agent_teams_usage の集計（agent-teams-tracker.js hook 由来）
+  const [agentTeamsActivity, setAgentTeamsActivity] = React.useState(null);
 
   React.useEffect(() => {
     applyTheme(t.darkMode);
@@ -1769,6 +1803,10 @@ const App = () => {
         .then(r => r.json())
         .then(d => { setLiveData(d); setLastUpdated(new Date()); })
         .catch(() => { /* モックデータで継続 */ });
+      fetch('/api/agent-teams')
+        .then(r => r.json())
+        .then(d => setAgentTeamsActivity(d))
+        .catch(() => { /* 取得失敗時は前回値を継続表示 */ });
     };
     fetchAll();
     const tid = setInterval(fetchAll, 30000);
@@ -1780,7 +1818,7 @@ const App = () => {
     switch (activePanel) {
       case "projects":  return <ProjectsPanel />;
       case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} liveData={liveData} />;
-      case "agents":    return <AgentsPanel state={state} liveData={liveData} />;
+      case "agents":    return <AgentsPanel state={state} liveData={liveData} agentTeamsActivity={agentTeamsActivity} />;
       case "cicd":      return <CICDPanel liveData={liveData} />;
       case "cron":      return <CronPanel liveData={liveData} />;
       case "boot":      return <BootPanel state={state} liveData={liveData} />;

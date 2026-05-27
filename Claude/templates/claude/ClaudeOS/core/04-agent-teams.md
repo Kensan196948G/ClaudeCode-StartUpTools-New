@@ -83,6 +83,50 @@ claude agents
 
 ---
 
+## 📊 計測と可視化（v9.0+ 追加）
+
+### 計測 hook
+
+`.claude/claudeos/scripts/hooks/agent-teams-tracker.js` が **PostToolUse** で
+`TeamCreate` / `SendMessage` の呼び出しを検出し、`state.agent_teams_usage` に記録する。
+
+記録項目:
+- `current_session.team_create_count` / `send_message_count`
+- `current_session.teammates[]`（spawn された teammate 名と subagent_type）
+- `current_session.patterns_used[]`（現フェーズから推定: Build→A / Verify→B / Monitor→C）
+- `history[]`（過去 50 セッション分の集計）
+
+### Dashboard 監視（Agent View 代替）
+
+`claude agents` (TUI) は別端末必須で Claude 内側から起動不可のため、
+**Mission Control ダッシュボードを Agent View 代替**として位置付ける。
+
+```bash
+node scripts/dashboards/serve-dashboard.js
+# → http://localhost:3737/mission-control
+```
+
+新規エンドポイント:
+- `GET /api/agent-teams` → `state.agent_teams_usage` の集計を返す
+
+Agent Teams タブ内の **Agent Teams Activity バッジ** で以下を 30 秒ごとに自動更新表示:
+- 現セッションの TeamCreate / SendMessage 回数
+- 現セッションで使用されたパターン
+- 直近 7 日のパターン別使用回数
+
+### SessionStart 推奨パターン提示
+
+`session-start.js` hook が起動時に `state.execution.phase` を読み取り、
+対応する Agent Teams パターン (A/B/C) を CTO Agent に提示する（強制ではなく指針）。
+
+| フェーズ | 推奨パターン |
+|---|---|
+| Build / Development | A — 並列実装 |
+| Verify / Quality / Repair | B — 品質強化 |
+| Monitor / Research / Design | C — 調査・設計 |
+
+---
+
 ## ⚖️ Sub-agent vs Agent Teams
 
 | 基準 | Sub-agent（Task） | Agent Teams |
