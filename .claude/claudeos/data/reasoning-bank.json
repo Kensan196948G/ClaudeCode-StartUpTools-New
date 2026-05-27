@@ -11,10 +11,10 @@
   "negative_patterns": [],
   "entries": [
     {
-      "id": "rb-2026-05-11T11-46-21-wp26",
-      "timestamp": "2026-05-11T11:46:21.255Z",
+      "id": "rb-2026-05-27T10-35-24-kncy",
+      "timestamp": "2026-05-27T10:35:24.996Z",
       "project": "ClaudeCode-StartUpTools-New",
-      "phase": "Improve",
+      "phase": "Monitor",
       "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
       "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
       "tags": [
@@ -30,35 +30,12 @@
       "ci_passed": true,
       "consecutive_success": 5,
       "confidence": 1,
-      "used_count": 11,
-      "last_used": "2026-05-11T12:29:59.083Z"
+      "used_count": 10,
+      "last_used": "2026-05-27T11:45:27.559Z"
     },
     {
-      "id": "rb-2026-05-12T09-05-22-1qf6",
-      "timestamp": "2026-05-12T09:05:22.255Z",
-      "project": "ClaudeCode-StartUpTools-New",
-      "phase": "Improve",
-      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
-      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
-      "tags": [
-        "ci",
-        "pr",
-        "docs",
-        "powershell"
-      ],
-      "outcome": "success",
-      "success_count": 21,
-      "failure_count": 0,
-      "stable_achieved": true,
-      "ci_passed": true,
-      "consecutive_success": 5,
-      "confidence": 1,
-      "used_count": 21,
-      "last_used": "2026-05-12T11:18:38.046Z"
-    },
-    {
-      "id": "rb-2026-05-12T11-47-41-bmhf",
-      "timestamp": "2026-05-12T11:47:41.852Z",
+      "id": "rb-2026-05-20T04-43-54-cuf0",
+      "timestamp": "2026-05-20T04:43:54.601Z",
       "project": "ClaudeCode-StartUpTools-New",
       "phase": "Monitor",
       "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
@@ -70,14 +47,37 @@
         "powershell"
       ],
       "outcome": "success",
-      "success_count": 29,
+      "success_count": 13,
       "failure_count": 0,
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 1,
-      "used_count": 29,
-      "last_used": "2026-05-12T23:59:05.186Z"
+      "confidence": 0.8,
+      "used_count": 12,
+      "last_used": "2026-05-20T07:13:25.498Z"
+    },
+    {
+      "id": "rb-2026-05-16T03-26-48-d52f",
+      "timestamp": "2026-05-16T03:26:48.359Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Monitor",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 23,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 0.54,
+      "used_count": 23,
+      "last_used": "2026-05-16T07:09:28.043Z"
     },
     {
       "id": "rb-2026-05-13T00-02-26-e7kt",
@@ -98,13 +98,13 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 1,
+      "confidence": 0.41,
       "used_count": 31,
       "last_used": "2026-05-13T05:19:20.458Z"
     },
     {
-      "id": "rb-2026-05-16T03-26-48-d52f",
-      "timestamp": "2026-05-16T03:26:48.359Z",
+      "id": "rb-2026-05-12T11-47-41-bmhf",
+      "timestamp": "2026-05-12T11:47:41.852Z",
       "project": "ClaudeCode-StartUpTools-New",
       "phase": "Monitor",
       "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
@@ -116,14 +116,83 @@
         "powershell"
       ],
       "outcome": "success",
-      "success_count": 18,
+      "success_count": 29,
       "failure_count": 0,
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 1,
-      "used_count": 18,
-      "last_used": "2026-05-16T06:33:08.670Z"
+      "confidence": 0.41,
+      "used_count": 29,
+      "last_used": "2026-05-12T23:59:05.186Z"
+    },
+    {
+      "id": "rb-2026-05-12T09-05-22-1qf6",
+      "timestamp": "2026-05-12T09:05:22.255Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 21,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 0.4,
+      "used_count": 21,
+      "last_used": "2026-05-12T11:18:38.046Z"
+    },
+    {
+      "id": "rb-2026-05-11T11-46-21-wp26",
+      "timestamp": "2026-05-11T11:46:21.255Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 11,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 0.38,
+      "used_count": 11,
+      "last_used": "2026-05-11T12:29:59.083Z"
+    },
+    {
+      "id": "rb-2026-05-10T02-26-33-v488",
+      "timestamp": "2026-05-10T02:26:33.877Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 2,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 0.35,
+      "used_count": 2,
+      "last_used": "2026-05-10T02:35:22.623Z"
     },
     {
       "id": "rb-seed-pr-merge-conflict",
@@ -143,7 +212,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 6,
-      "confidence": 0.93,
+      "confidence": 0.15,
       "used_count": 12,
       "last_used": "2026-05-16T00:00:00.000Z"
     },
@@ -165,54 +234,9 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.93,
+      "confidence": 0.15,
       "used_count": 7,
       "last_used": "2026-05-15T16:00:00.000Z"
-    },
-    {
-      "id": "rb-2026-05-10T02-26-33-v488",
-      "timestamp": "2026-05-10T02:26:33.877Z",
-      "project": "ClaudeCode-StartUpTools-New",
-      "phase": "Improve",
-      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
-      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
-      "tags": [
-        "ci",
-        "pr",
-        "docs",
-        "powershell"
-      ],
-      "outcome": "success",
-      "success_count": 2,
-      "failure_count": 0,
-      "stable_achieved": true,
-      "ci_passed": true,
-      "consecutive_success": 5,
-      "confidence": 0.89,
-      "used_count": 2,
-      "last_used": "2026-05-10T02:35:22.623Z"
-    },
-    {
-      "id": "rb-seed-security-scan-critical",
-      "timestamp": "2026-05-02T11:00:00.000Z",
-      "project": "seed-pattern",
-      "phase": "Verify",
-      "problem_pattern": "セキュリティスキャン Critical 検出 / npm audit critical",
-      "approach": "npm audit fix で自動修正を試みる。自動修正不可の場合は代替パッケージを検索。breaking change がある場合は影響範囲を確認してから手動更新。修正後 npm audit で Critical=0 を確認してから PR。",
-      "tags": [
-        "security",
-        "ci",
-        "bugfix"
-      ],
-      "outcome": "success",
-      "success_count": 5,
-      "failure_count": 0,
-      "stable_achieved": true,
-      "ci_passed": true,
-      "consecutive_success": 5,
-      "confidence": 0.88,
-      "used_count": 5,
-      "last_used": "2026-05-14T08:00:00.000Z"
     },
     {
       "id": "rb-seed-typescript-lint-fix",
@@ -233,31 +257,31 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 4,
-      "confidence": 0.86,
+      "confidence": 0.15,
       "used_count": 9,
       "last_used": "2026-05-15T10:00:00.000Z"
     },
     {
-      "id": "rb-seed-docker-build-fail",
-      "timestamp": "2026-05-05T09:00:00.000Z",
+      "id": "rb-seed-security-scan-critical",
+      "timestamp": "2026-05-02T11:00:00.000Z",
       "project": "seed-pattern",
       "phase": "Verify",
-      "problem_pattern": "Docker build 失敗 / docker-compose up エラー",
-      "approach": "docker-compose down --volumes でクリーンアップ後に再ビルド。Dockerfile の COPY 順序と .dockerignore を確認。マルチステージビルドの場合は中間イメージのキャッシュを docker build --no-cache で回避。",
+      "problem_pattern": "セキュリティスキャン Critical 検出 / npm audit critical",
+      "approach": "npm audit fix で自動修正を試みる。自動修正不可の場合は代替パッケージを検索。breaking change がある場合は影響範囲を確認してから手動更新。修正後 npm audit で Critical=0 を確認してから PR。",
       "tags": [
-        "docker",
-        "build",
-        "ci"
+        "security",
+        "ci",
+        "bugfix"
       ],
       "outcome": "success",
-      "success_count": 4,
-      "failure_count": 1,
+      "success_count": 5,
+      "failure_count": 0,
       "stable_achieved": true,
       "ci_passed": true,
-      "consecutive_success": 3,
-      "confidence": 0.69,
+      "consecutive_success": 5,
+      "confidence": 0.15,
       "used_count": 5,
-      "last_used": "2026-05-12T14:00:00.000Z"
+      "last_used": "2026-05-14T08:00:00.000Z"
     },
     {
       "id": "rb-seed-ci-windows-path",
@@ -277,9 +301,31 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 3,
-      "confidence": 0.67,
+      "confidence": 0.15,
       "used_count": 8,
       "last_used": "2026-05-13T15:00:00.000Z"
+    },
+    {
+      "id": "rb-seed-docker-build-fail",
+      "timestamp": "2026-05-05T09:00:00.000Z",
+      "project": "seed-pattern",
+      "phase": "Verify",
+      "problem_pattern": "Docker build 失敗 / docker-compose up エラー",
+      "approach": "docker-compose down --volumes でクリーンアップ後に再ビルド。Dockerfile の COPY 順序と .dockerignore を確認。マルチステージビルドの場合は中間イメージのキャッシュを docker build --no-cache で回避。",
+      "tags": [
+        "docker",
+        "build",
+        "ci"
+      ],
+      "outcome": "success",
+      "success_count": 4,
+      "failure_count": 1,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 3,
+      "confidence": 0.15,
+      "used_count": 5,
+      "last_used": "2026-05-12T14:00:00.000Z"
     }
   ]
 }
