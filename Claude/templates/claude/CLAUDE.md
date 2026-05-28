@@ -353,6 +353,13 @@ claude agents
 | 大規模設計検討（多観点） | ✅ パターン C |
 | 1 ファイル修正 / Lint / docs | ❌ Sub-agent で十分 |
 
+> **第3階層 dynamic workflows（v2.1.154+）**: 数十〜1000 agent を script で
+> オーケストレーションする場合は `/workflows`（軽量に始めるなら `/deep-research`）を使う。
+> Agent Teams の上位スケール層で、中間結果が script 変数に留まるため context 効率が良い。
+> 起動ガードレール（token < 70% / 残 ≥ 60min / `ultracode` 既定化禁止 / session 終了で破棄）と
+> 3 階層マトリクスは `claudeos/core/04-agent-teams.md`「dynamic workflows」§ を正本とする。
+> `.github/workflows/*.yml`（CI）とは別物。
+
 ## 7. Issue Factory
 
 ### 生成条件
