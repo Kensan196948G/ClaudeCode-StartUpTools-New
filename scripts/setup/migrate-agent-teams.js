@@ -24,6 +24,11 @@
 //   node scripts/setup/migrate-agent-teams.js --apply                  # 全プロジェクト適用
 //   node scripts/setup/migrate-agent-teams.js --apply --project ProjA  # 個別適用
 //   node scripts/setup/migrate-agent-teams.js --rollback               # 復元
+//
+// SSH 越し実行時の注意 (Linux):
+//   非 TTY では Node の stdout がブロックバッファされ、完走していても出力が出ず「固まった」
+//   ように見える。stdbuf で行バッファ化し timeout で保護すると安全:
+//     ssh host 'cd <repo> && timeout 120 stdbuf -oL -eL node scripts/setup/migrate-agent-teams.js --apply'
 
 const fs   = require("fs");
 const path = require("path");
@@ -84,6 +89,10 @@ Usage:
 Options:
   --config <path>   Path to config.json or linux-projects.json (default: auto-detect)
   --project <name>  Filter by project name
+
+SSH tip (Linux): run with line-buffered stdout so output streams instead of
+appearing to hang on non-TTY sessions:
+  ssh host 'cd <repo> && timeout 120 stdbuf -oL -eL node scripts/setup/migrate-agent-teams.js --apply'
 `);
 }
 

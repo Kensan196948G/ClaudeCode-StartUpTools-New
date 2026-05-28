@@ -209,6 +209,11 @@ token をプラン上限に計上する。以下を厳守:
 project 配置分は TemplateSyncManager 経由で全登録プロジェクトへ配布可能。
 （ClaudeOS 専用 workflow の著作は live run 検証を伴うフォローアップで実施）
 
+> 💡 **SSH 越しで migrate / 配布スクリプトを実行する時は `stdbuf -oL -eL node …` を使う**:
+> 非 TTY だと Node の stdout がブロックバッファされ、**完走していても出力が出ず「固まった」ように見える**。
+> `stdbuf -oL` で行バッファ化すれば即時表示。`timeout N` 併用で安全に切り分けできる。
+> 例: `ssh host 'cd <repo> && timeout 120 stdbuf -oL -eL node scripts/setup/migrate-agent-teams.js --apply'`
+
 ### 🔌 無効化（必要時）
 
 `disableWorkflows: true`（settings）/ `CLAUDE_CODE_DISABLE_WORKFLOWS=1` / `/config` トグル。
