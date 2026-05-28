@@ -37,6 +37,10 @@
           {
             "type": "command",
             "command": "node .claude/claudeos/scripts/hooks/session-start.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/verify-goal-set.js"
           }
         ]
       }
@@ -59,6 +63,24 @@
           {
             "type": "command",
             "command": "node .claude/claudeos/scripts/hooks/usage-tracker.js"
+          }
+        ]
+      },
+      {
+        "matcher": "TeamCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/agent-teams-tracker.js"
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/agent-teams-tracker.js"
           }
         ]
       }

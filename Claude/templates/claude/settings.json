@@ -90,6 +90,24 @@
             "command": "node .claude/claudeos/scripts/hooks/auto-format.js"
           }
         ]
+      },
+      {
+        "matcher": "TeamCreate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/agent-teams-tracker.js"
+          }
+        ]
+      },
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/claudeos/scripts/hooks/agent-teams-tracker.js"
+          }
+        ]
       }
     ]
   }

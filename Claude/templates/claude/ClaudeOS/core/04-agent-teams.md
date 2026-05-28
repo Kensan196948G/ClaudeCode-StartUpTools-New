@@ -83,6 +83,50 @@ claude agents
 
 ---
 
+## 📊 計測と可視化（v9.0+ 追加）
+
+### 計測 hook
+
+`.claude/claudeos/scripts/hooks/agent-teams-tracker.js` が **PostToolUse** で
+`TeamCreate` / `SendMessage` の呼び出しを検出し、`state.agent_teams_usage` に記録する。
+
+記録項目:
+- `current_session.team_create_count` / `send_message_count`
+- `current_session.teammates[]`（spawn された teammate 名と subagent_type）
+- `current_session.patterns_used[]`（現フェーズから推定: Build→A / Verify→B / Monitor→C）
+- `history[]`（過去 50 セッション分の集計）
+
+### Dashboard 監視（Agent View 代替）
+
+`claude agents` (TUI) は別端末必須で Claude 内側から起動不可のため、
+**Mission Control ダッシュボードを Agent View 代替**として位置付ける。
+
+```bash
+node scripts/dashboards/serve-dashboard.js
+# → http://localhost:3737/mission-control
+```
+
+新規エンドポイント:
+- `GET /api/agent-teams` → `state.agent_teams_usage` の集計を返す
+
+Agent Teams タブ内の **Agent Teams Activity バッジ** で以下を 30 秒ごとに自動更新表示:
+- 現セッションの TeamCreate / SendMessage 回数
+- 現セッションで使用されたパターン
+- 直近 7 日のパターン別使用回数
+
+### SessionStart 推奨パターン提示
+
+`session-start.js` hook が起動時に `state.execution.phase` を読み取り、
+対応する Agent Teams パターン (A/B/C) を CTO Agent に提示する（強制ではなく指針）。
+
+| フェーズ | 推奨パターン |
+|---|---|
+| Build / Development | A — 並列実装 |
+| Verify / Quality / Repair | B — 品質強化 |
+| Monitor / Research / Design | C — 調査・設計 |
+
+---
+
 ## ⚖️ Sub-agent vs Agent Teams
 
 | 基準 | Sub-agent（Task） | Agent Teams |
@@ -100,6 +144,80 @@ claude agents
 | CI + Security + テスト同時 | ✅ パターン B |
 | 大規模設計検討 | ✅ パターン C |
 | 1 ファイル修正 / Lint / docs | ❌ Sub-agent で十分 |
+
+---
+
+## 🌀 dynamic workflows（第3オーケストレーション階層・v2.1.154+）
+
+`/workflows` は **Claude が書いた JS script を runtime がバックグラウンド実行**し、
+数十〜1000 の subagent をオーケストレーションする公式機能（research preview）。
+Agent Teams の上位スケール層であり、**tmux / 外部オーケストレータ不要**で機能する。
+
+> ⚠️ **GitHub Actions workflow（`.github/workflows/*.yml`）とは別物。**
+> あちらは CI。dynamic workflow は `.claude/workflows/*.js`。混同しないこと。
+
+### 🗺️ 3 階層の使い分け（Sub-agent → Agent Teams → workflows）
+
+| 階層 | プリミティブ | 計画保持 | 中間結果 | スケール | ClaudeOS 用途 |
+|---|---|---|---|---|---|
+| 1 | Sub-agent (Task) | Claude 毎ターン | context 内 | 数件 | Lint 修正・単機能・docs 更新 |
+| 2 | Agent Teams | Claude 毎ターン・相互通信 | 各 window | 数体 | フルスタック協調・CI+Sec+test 同時 |
+| 3 | **dynamic workflows** | **script (runtime)** | **script 変数** | **数十〜1000** | **Gate 検証スイープ・大規模監査・Pattern C 調査** |
+
+**第3階層が有利な点**: 中間結果が script 変数に留まり **最終回答だけ context に返る** ため、
+Agent Teams の「token 3-5倍」と逆で、5 時間 / token 予算（§13 / §14）に優しい。
+runtime に **16 並列 / 1000 agents 上限**が組み込まれ「暴走」を構造的に防ぐ。
+
+### 🎬 起動方法
+
+| 方法 | 使い方 | ClaudeOS 方針 |
+|---|---|---|
+| バンドル | `/deep-research <問い>` | ✅ Monitor / Pattern C の技術調査に推奨 |
+| キーワード | プロンプトに `workflow` の語を含める | ✅ 明示起動。CTO 判断で使用 |
+| 保存コマンド | `.claude/workflows/<name>.js` → `/<name>` | ✅ 反復作業を codify |
+| ultracode | `/effort ultracode`（全タスク自動 workflow 化） | ❌ **既定化しない**（token 急増・暴走源） |
+
+### 🛡️ ガードレール（CTO 行動ルール）
+
+dynamic workflow は **session 終了で in-progress 分が破棄**され（resume は同一セッション内のみ）、
+token をプラン上限に計上する。以下を厳守:
+
+- ✅ **起動可**: token 消費 < 70%（§13）かつ セッション残り ≥ 60 分（§14）
+- ❌ **起動不可**:
+  - セッション残り < 60 分（終了で成果が破棄される）
+  - token ≥ 70%
+  - Stabilize / Release フェーズの大規模変更
+  - `/effort ultracode` の既定化
+- SessionStart hook が `workflows: 起動可 / 抑制` をフェーズ・残時間から自動提示する
+- 並列・総数の上限管理（16 / 1000）は runtime に委ねる
+
+### 👁 監視（`/workflows`）
+
+`claude agents`（Agent View）とは別に、workflow 専用のビルトイン監視 UI がある:
+
+```text
+/workflows        # 実行中・完了済 run の一覧 → Enter で phase / agent / token / elapsed を確認
+```
+
+操作: `p` 一時停止/再開 ・ `x` 停止 ・ `r` agent 再起動 ・ `s` script を保存（コマンド化）
+
+> Agent Teams のような自前ダッシュボードは不要（built-in 監視で足りる）。
+
+### 📦 保存と全プロジェクト配布
+
+`/workflows` → `s` で `.claude/workflows/<name>.js`（project）に保存すると `/<name>` 化される。
+project 配置分は TemplateSyncManager 経由で全登録プロジェクトへ配布可能。
+（ClaudeOS 専用 workflow の著作は live run 検証を伴うフォローアップで実施）
+
+### 🔌 無効化（必要時）
+
+`disableWorkflows: true`（settings）/ `CLAUDE_CODE_DISABLE_WORKFLOWS=1` / `/config` トグル。
+**ClaudeOS 既定では無効化しない（有効状態を維持）。**
+
+### 📝 将来の取り込み候補（ChangeLog メモ）
+
+- **continueOnBlock**（PostToolUse）: 現状 ClaudeOS の guard hook は pre-commit / Stop で動くため適用先なし。将来 blocking PostToolUse を足す時に検討
+- **hook `args:[]` exec 形式**: shell を介さず quoting 事故を防ぐ。Win / Linux 両対応の堅牢化として必要時に移行
 
 ---
 

@@ -679,6 +679,53 @@ function getActiveCronProject() {
   return bestEntry;
 }
 
+/**
+ * Agent Teams Activity: state.agent_teams_usage を返す。
+ * agent-teams-tracker.js hook が記録した TeamCreate / SendMessage 使用統計。
+ * 既存の getAgentAndEventData() (session 由来) とは別データソース。
+ */
+function getAgentTeamsActivity() {
+  try {
+    const stateFile = path.join(PROJ_ROOT, 'state.json');
+    if (!fs.existsSync(stateFile)) return { usage: null, available: false };
+    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+    const atu = state.agent_teams_usage || null;
+    if (!atu) return { usage: null, available: false };
+
+    const cur     = atu.current_session || {};
+    const history = Array.isArray(atu.history) ? atu.history : [];
+
+    // パターン別集計（過去 7 日）
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+    const recent = history.filter(h => {
+      try { return new Date(h.session_start_at).getTime() >= sevenDaysAgo; } catch { return false; }
+    });
+    const patternCount = { A: 0, B: 0, C: 0 };
+    recent.forEach(h => (h.patterns_used || []).forEach(p => {
+      if (patternCount[p] !== undefined) patternCount[p] += 1;
+    }));
+
+    return {
+      available: true,
+      session_start_at: atu.session_start_at || null,
+      current: {
+        team_create_count:  cur.team_create_count  || 0,
+        send_message_count: cur.send_message_count || 0,
+        patterns_used:      cur.patterns_used      || [],
+        last_activity_at:   cur.last_activity_at   || null,
+        teammates:          (cur.teammates || []).slice(-10),  // 直近 10 件
+      },
+      last_7days: {
+        sessions_with_teams: recent.length,
+        pattern_count:       patternCount,
+      },
+      history_total: history.length,
+    };
+  } catch (e) {
+    return { usage: null, available: false, error: e.message };
+  }
+}
+
 /** Trust Score: trust-score.json を読み込んで返す（/health エンドポイント共用） */
 function readTrustScore() {
   try {
@@ -950,6 +997,17 @@ if (require.main === module) {
     }
     if (req.url === '/api/data')           return handleApiData(res);
     if (req.url === '/api/mc-data')        { handleMcData(res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} }); return; }
+    if (req.url === '/api/agent-teams') {
+      try {
+        const data = getAgentTeamsActivity();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+        res.end(JSON.stringify({ ...data, generated: new Date().toISOString() }, null, 2));
+      } catch (e) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+      return;
+    }
     if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());
