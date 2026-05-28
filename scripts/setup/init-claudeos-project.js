@@ -40,13 +40,16 @@ const MAPPINGS = [
   { type: "dir",  src: "Claude/templates/claudeos/hooks",         dest: ".claude/hooks",         label: ".claude/hooks" },
   { type: "dir",  src: "Claude/templates/claudeos/scripts/tools", dest: "scripts/tools",         label: "scripts/tools" },
   { type: "file", src: "Claude/templates/claude/CLAUDE.md",       dest: "CLAUDE.md",             label: "CLAUDE.md" },
-  { type: "file", src: "Claude/templates/claude/settings.json",   dest: ".claude/settings.json", label: ".claude/settings.json" },
   { type: "file", src: "scripts/templates/claude-mcp.json",       dest: ".mcp.json",             label: ".mcp.json" },
   { type: "file", src: "scripts/templates/claude-statusline.py",  dest: ".claude/statusline.py", label: ".claude/statusline.py" },
 ];
 
-const STATE_TEMPLATE = "Claude/templates/claude/ClaudeOS/templates/state.json";
-const SKILLS_DIRTY    = ".claude/claudeos/.skills-dirty";
+// settings.json は copy-if-missing ではなく deep-merge で処理する (MAPPINGS とは別)。
+// 既存プロジェクトの settings.json は permissions/env をカスタムしている場合があり、
+// それらを保護しつつ ClaudeOS の hooks 登録 + 必要 env を *不足分だけ* 補完する。
+const SETTINGS_TEMPLATE = "Claude/templates/claude/settings.json";
+const STATE_TEMPLATE    = "Claude/templates/claude/ClaudeOS/templates/state.json";
+const SKILLS_DIRTY       = ".claude/claudeos/.skills-dirty";
 
 // ──────────────────────────────────────────────────────────────────────
 function parseArgs(argv) {
@@ -148,6 +151,59 @@ function copyFileIfMissing(src, dest, plan, dryRun, transform) {
   }
 }
 
+// settings.json を deep-merge: hooks (per-event, matcher+command で重複排除) と env を
+// 不足分だけ追加。permissions と既存スカラー値は保護 (上書きしない)。
+function mergeSettings(srcPath, destPath, plan, dryRun) {
+  if (!fs.existsSync(srcPath)) { plan.srcMissing.push(srcPath); return; }
+  if (!fs.existsSync(destPath)) {            // 新規: テンプレをそのままコピー
+    plan.create++;
+    if (!dryRun) { fs.mkdirSync(path.dirname(destPath), { recursive: true }); fs.copyFileSync(srcPath, destPath); }
+    return;
+  }
+  let tmpl, cur;
+  try { tmpl = JSON.parse(fs.readFileSync(srcPath, "utf8")); cur = JSON.parse(fs.readFileSync(destPath, "utf8")); }
+  catch (e) { console.error(`  WARN: settings.json parse 失敗、merge skip: ${e.message}`); plan.skip++; return; }
+
+  let added = 0;
+  // top-level キー (hooks/env/permissions 以外): 欠けていれば追加、既存は保護
+  for (const k of Object.keys(tmpl)) {
+    if (k === "hooks" || k === "env" || k === "permissions") continue;
+    if (!(k in cur)) { cur[k] = tmpl[k]; added++; }
+  }
+  // env: 欠けている key を追加、既存値は保護
+  if (tmpl.env && typeof tmpl.env === "object") {
+    cur.env = (cur.env && typeof cur.env === "object") ? cur.env : {};
+    for (const [k, v] of Object.entries(tmpl.env)) {
+      if (!(k in cur.env)) { cur.env[k] = v; added++; }
+    }
+  }
+  // hooks: event ごとに (matcher + command 群) シグネチャで重複排除して不足分を追加
+  const sig = (e) => JSON.stringify({ m: e.matcher, c: (e.hooks || []).map(h => h.command) });
+  if (tmpl.hooks && typeof tmpl.hooks === "object") {
+    cur.hooks = (cur.hooks && typeof cur.hooks === "object") ? cur.hooks : {};
+    for (const [event, entries] of Object.entries(tmpl.hooks)) {
+      cur.hooks[event] = Array.isArray(cur.hooks[event]) ? cur.hooks[event] : [];
+      const have = new Set(cur.hooks[event].map(sig));
+      for (const entry of entries) {
+        if (!have.has(sig(entry))) { cur.hooks[event].push(entry); have.add(sig(entry)); added++; }
+      }
+    }
+  }
+  // permissions は各プロジェクトのセキュリティ方針なので一切触らない。
+
+  if (added > 0) {
+    plan.merge += added;
+    if (!dryRun) {
+      fs.copyFileSync(destPath, destPath + ".bak-init");
+      const tmp = destPath + ".tmp." + process.pid;
+      fs.writeFileSync(tmp, JSON.stringify(cur, null, 2) + "\n", "utf8");
+      fs.renameSync(tmp, destPath);
+    }
+  } else {
+    plan.skip++;
+  }
+}
+
 // ──────────────────────────────────────────────────────────────────────
 function main() {
   const args       = parseArgs(process.argv.slice(2));
@@ -166,7 +222,7 @@ function main() {
   console.log(`[init] mode   : ${args.mode}`);
   console.log("");
 
-  const totals = { create: 0, skip: 0, srcMissing: [] };
+  const totals = { create: 0, skip: 0, merge: 0, srcMissing: [] };
 
   for (const m of MAPPINGS) {
     const src  = path.join(REPO_ROOT, m.src);
@@ -179,6 +235,17 @@ function main() {
     totals.srcMissing.push(...plan.srcMissing);
     const note = plan.srcMissing.length ? " (SOURCE MISSING!)" : "";
     console.log(`  ${tag} ${m.label}: +${plan.create} new / ${plan.skip} kept${note}`);
+  }
+
+  // settings.json を deep-merge (既存の permissions/env を保護しつつ ClaudeOS の hooks 登録 + env を補完)
+  {
+    const src  = path.join(REPO_ROOT, SETTINGS_TEMPLATE);
+    const dest = path.join(targetPath, ".claude/settings.json");
+    const plan = { create: 0, skip: 0, merge: 0, srcMissing: [] };
+    mergeSettings(src, dest, plan, dryRun);
+    totals.create += plan.create; totals.skip += plan.skip; totals.merge += plan.merge; totals.srcMissing.push(...plan.srcMissing);
+    const detail = plan.create ? "+1 new" : (plan.merge ? `+${plan.merge} merged (hooks/env)` : "up-to-date (kept)");
+    console.log(`  ${tag} .claude/settings.json: ${detail}${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
   }
 
   // state.json を seed (YOUR_PROJECT → 実プロジェクト名に置換)
@@ -203,12 +270,12 @@ function main() {
 
   console.log("");
   console.log("─".repeat(60));
-  console.log(`Summary: ${dryRun ? "would-create" : "created"}=${totals.create}  kept=${totals.skip}`);
+  console.log(`Summary: ${dryRun ? "would-create" : "created"}=${totals.create}  ${dryRun ? "would-merge" : "merged"}=${totals.merge}  kept=${totals.skip}`);
   if (totals.srcMissing.length) {
     console.log(`⚠️  source missing (${totals.srcMissing.length}): ${totals.srcMissing.join(", ")}`);
   }
-  if (totals.create === 0) {
-    console.log("ClaudeOS は既に導入済みのようです (新規作成ファイルなし)。");
+  if (totals.create === 0 && totals.merge === 0) {
+    console.log("ClaudeOS は既に導入済みのようです (変更なし)。");
   } else if (!dryRun) {
     console.log("");
     console.log("次の推奨ステップ: session-start.js 等を最新化");
