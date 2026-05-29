@@ -27,6 +27,10 @@
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    @keyframes ssePulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
     input:focus { border-color: #00d4ff !important; outline: none; }
     button { font-family: inherit; }
     code { font-family: 'JetBrains Mono', monospace; }
@@ -401,7 +405,7 @@ function Tag({ children, color, bg }) {
 }
 window.Tag = Tag;
 
-function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark, lastUpdated }) {
+function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDark, lastUpdated, sseConnected, livePhase }) {
   const [now, setNow] = useState(new Date());
   useEffect(() => {
     const t = setInterval(() => { setNow(new Date()); setSessionElapsed(prev => prev + 1/60); }, 1000);
@@ -441,7 +445,13 @@ function TopBar({ state, sessionElapsed, setSessionElapsed, darkMode, onToggleDa
           <span style={{ fontSize:11, fontFamily:MC.mono, color:MC.green }}>ACTIVE</span>
         </div>
         <div style={{ fontSize:11, fontFamily:MC.mono, color:MC.textDim }}>
-          Phase: <span style={{ color:"#00d4aa" }}>{state.execution.phase}</span>
+          Phase: <span style={{ color:"#00d4aa" }}>{livePhase || state.execution.phase}</span>
+        </div>
+        {/* SSE ライブ接続インジケーター */}
+        <div style={{ fontSize:10, fontFamily:MC.mono, display:"flex", alignItems:"center", gap:3,
+          color: sseConnected ? "#ff4444" : MC.textMuted }}>
+          <span style={{ fontSize:8, animation: sseConnected ? "ssePulse 1.5s ease-in-out infinite" : "none" }}>●</span>
+          <span>{sseConnected ? "LIVE" : "OFFLINE"}</span>
         </div>
         {/* 最終データ更新時刻 */}
         <div style={{ fontSize:9, fontFamily:MC.mono, color:MC.textMuted, display:"flex", alignItems:"center", gap:3 }}>
@@ -1874,49 +1884,75 @@ window.BootPanel = BootPanel;
        BLOCK 9: Event Log Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
-const LogPanel = ({ liveData }) => {
+const LogPanel = ({ liveData, liveLines }) => {
   const logs = (liveData?.eventLog?.length ? liveData.eventLog : null) || window.EVENT_LOG;
   const [filter, setFilter] = React.useState("all");
   const [autoScroll, setAutoScroll] = React.useState(true);
-  const logRef = React.useRef(null);
-  const filtered = filter==="all" ? logs : logs.filter(l => l.type===filter);
+  const logRef  = React.useRef(null);
+  const liveRef = React.useRef(null);
+  const isLive  = filter === "live";
+  const filtered = filter === "all" ? logs : filter === "live" ? [] : logs.filter(l => l.type === filter);
   React.useEffect(() => {
-    if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+    if (autoScroll && logRef.current)  logRef.current.scrollTop  = logRef.current.scrollHeight;
   }, [filtered.length, autoScroll]);
+  React.useEffect(() => {
+    if (autoScroll && liveRef.current) liveRef.current.scrollTop = liveRef.current.scrollHeight;
+  }, [(liveLines || []).length, autoScroll]);
   const typeColors = { info:MC.textDim, success:MC.green, decision:MC.amber, phase:MC.accent, error:MC.red };
   const typeLabels = { info:"情報", success:"成功", decision:"判断", phase:"フェーズ", error:"エラー" };
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:12, height:"100%" }}>
       <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-        {[["all","すべて"],["info","情報"],["success","成功"],["decision","判断"],["phase","フェーズ"],["error","エラー"]].map(([id,label]) => (
-          <button key={id} onClick={() => setFilter(id)} style={{ padding:"5px 12px", borderRadius:4, border:`1px solid ${filter===id ? MC.accent : MC.border}`, background: filter===id ? MC.accent+"18" : "transparent", color: filter===id ? MC.accent : MC.textMuted, fontSize:11, cursor:"pointer", fontWeight:500 }}>{label}</button>
+        {[["all","すべて"],["live","🔴 ライブ"],["info","情報"],["success","成功"],["decision","判断"],["phase","フェーズ"],["error","エラー"]].map(([id,label]) => (
+          <button key={id} onClick={() => setFilter(id)} style={{ padding:"5px 12px", borderRadius:4, border:`1px solid ${filter===id ? (id==="live"?"#ff4444":MC.accent) : MC.border}`, background: filter===id ? (id==="live"?"#ff444418":MC.accent+"18") : "transparent", color: filter===id ? (id==="live"?"#ff4444":MC.accent) : MC.textMuted, fontSize:11, cursor:"pointer", fontWeight:500 }}>{label}</button>
         ))}
         <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6 }}>
           <button onClick={() => setAutoScroll(!autoScroll)} style={{ padding:"5px 10px", borderRadius:4, border:`1px solid ${MC.border}`, background: autoScroll ? MC.green+"18" : "transparent", color: autoScroll ? MC.green : MC.textMuted, fontSize:10, cursor:"pointer" }}>{autoScroll ? "⬇ 自動スクロール ON" : "⬇ 自動スクロール OFF"}</button>
-          <span style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>{filtered.length}件</span>
+          <span style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>{isLive ? (liveLines||[]).length : filtered.length}件</span>
         </div>
       </div>
-      <Panel title="イベントログ" icon="📜" noPad style={{ flex:1 }}>
-        <div ref={logRef} style={{ height:"100%", overflow:"auto", fontFamily:MC.mono, fontSize:11 }}>
-          <table style={{ width:"100%", borderCollapse:"collapse" }}>
-            <thead><tr style={{ position:"sticky", top:0, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, zIndex:1 }}>
-              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:80 }}>時刻</th>
-              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:160 }}>エージェント</th>
-              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10 }}>メッセージ</th>
-              <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:60 }}>種別</th>
-            </tr></thead>
-            <tbody>
-              {filtered.map((log,i) => (
-                <tr key={i} style={{ borderBottom:`1px solid ${MC.border}06`, background: i%2===0 ? "transparent" : MC.bgCard+"40" }}>
-                  <td style={{ padding:"6px 12px", color:MC.textMuted, fontSize:10, whiteSpace:"nowrap" }}>{log.time}</td>
-                  <td style={{ padding:"6px 12px", color:MC.text, fontSize:11 }}>{log.agent}</td>
-                  <td style={{ padding:"6px 12px", color:typeColors[log.type]||MC.textDim, lineHeight:1.4 }}>{log.message}</td>
-                  <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{typeLabels[log.type]||log.type}</Tag></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Panel title={isLive ? "🔴 ライブフィード (SSE)" : "イベントログ"} icon="📜" noPad style={{ flex:1 }}>
+        {isLive ? (
+          <div ref={liveRef} style={{ height:"100%", overflow:"auto", fontFamily:MC.mono, fontSize:11, padding:"4px 0" }}>
+            {(liveLines||[]).length === 0 ? (
+              <div style={{ padding:16, color:MC.textMuted }}>SSE 接続待ち… ライブログがここに流れます。</div>
+            ) : (
+              (liveLines||[]).map((item, i) => (
+                <div key={i} style={{ padding:"3px 12px", borderBottom:`1px solid ${MC.border}06`,
+                  background: i % 2 === 0 ? "transparent" : MC.bgCard+"30",
+                  display:"flex", gap:12, alignItems:"baseline" }}>
+                  <span style={{ color:MC.textMuted, fontSize:10, flexShrink:0, width:80 }}>
+                    {(item.at||"").slice(11,19)}
+                  </span>
+                  <span style={{ color: item.line?.startsWith("[") ? MC.accent : MC.textDim, lineHeight:1.5, wordBreak:"break-all" }}>
+                    {item.line}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          <div ref={logRef} style={{ height:"100%", overflow:"auto", fontFamily:MC.mono, fontSize:11 }}>
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead><tr style={{ position:"sticky", top:0, background:MC.bgPanel, borderBottom:`1px solid ${MC.border}`, zIndex:1 }}>
+                <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:80 }}>時刻</th>
+                <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:160 }}>エージェント</th>
+                <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10 }}>メッセージ</th>
+                <th style={{ padding:"8px 12px", textAlign:"left", color:MC.textMuted, fontWeight:500, fontSize:10, width:60 }}>種別</th>
+              </tr></thead>
+              <tbody>
+                {filtered.map((log,i) => (
+                  <tr key={i} style={{ borderBottom:`1px solid ${MC.border}06`, background: i%2===0 ? "transparent" : MC.bgCard+"40" }}>
+                    <td style={{ padding:"6px 12px", color:MC.textMuted, fontSize:10, whiteSpace:"nowrap" }}>{log.time}</td>
+                    <td style={{ padding:"6px 12px", color:MC.text, fontSize:11 }}>{log.agent}</td>
+                    <td style={{ padding:"6px 12px", color:typeColors[log.type]||MC.textDim, lineHeight:1.4 }}>{log.message}</td>
+                    <td style={{ padding:"6px 12px" }}><Tag color={typeColors[log.type]||MC.textMuted}>{typeLabels[log.type]||log.type}</Tag></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Panel>
     </div>
   );
@@ -1940,6 +1976,10 @@ const App = () => {
   const [lastUpdated, setLastUpdated] = React.useState(null);
   // agentTeamsActivity: state.agent_teams_usage の集計（agent-teams-tracker.js hook 由来）
   const [agentTeamsActivity, setAgentTeamsActivity] = React.useState(null);
+  // SSE リアルタイム状態
+  const [sseConnected, setSseConnected] = React.useState(false);
+  const [livePhase, setLivePhase]       = React.useState(null);
+  const [liveLines, setLiveLines]       = React.useState([]);
 
   React.useEffect(() => {
     applyTheme(t.darkMode);
@@ -1950,6 +1990,33 @@ const App = () => {
     MC.accent = t.accentColor;
     forceRender(n => n + 1);
   }, [t.accentColor]);
+
+  // SSE 接続 — リアルタイムイベント受信
+  React.useEffect(() => {
+    const es = new EventSource('/api/events');
+    es.onopen  = () => setSseConnected(true);
+    es.onerror = () => setSseConnected(false);
+    es.addEventListener('state-change', e => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.phase) setLivePhase(d.phase);
+      } catch {}
+    });
+    es.addEventListener('log-line', e => {
+      try {
+        const d = JSON.parse(e.data);
+        setLiveLines(prev => [...prev.slice(-199), d]);
+      } catch {}
+    });
+    es.addEventListener('job-update', e => {
+      try {
+        // job-update は JobsPanel の 3秒ポーリングが拾うため状態更新はスキップ
+        const d = JSON.parse(e.data);
+        setLiveLines(prev => [...prev.slice(-199), { line: `[job] ${d.jobId}: ${d.status}${d.exitCode!=null?' exit:'+d.exitCode:''}`, at: new Date().toISOString() }]);
+      } catch {}
+    });
+    return () => es.close();
+  }, []);
 
   // 単一の 30秒ポーリング — 全パネルに liveData を供給
   React.useEffect(() => {
@@ -1978,7 +2045,7 @@ const App = () => {
       case "cicd":      return <CICDPanel liveData={liveData} />;
       case "cron":      return <CronPanel liveData={liveData} />;
       case "boot":      return <BootPanel state={state} liveData={liveData} />;
-      case "log":       return <LogPanel liveData={liveData} />;
+      case "log":       return <LogPanel liveData={liveData} liveLines={liveLines} />;
       default:          return <ProjectsPanel />;
     }
   };
@@ -1990,7 +2057,7 @@ const App = () => {
       )}
       <TopBar state={window.MOCK_STATE} sessionElapsed={sessionElapsed} setSessionElapsed={setSessionElapsed}
         darkMode={t.darkMode} onToggleDark={() => setTweak("darkMode", !t.darkMode)}
-        lastUpdated={lastUpdated} />
+        lastUpdated={lastUpdated} sseConnected={sseConnected} livePhase={livePhase} />
       <div style={{ display:"flex", flex:1, overflow:"hidden" }}>
         <SideNav active={activePanel} onChange={setActivePanel} />
         <main style={{ flex:1, padding:16, overflow:"auto", animation: t.animationsEnabled ? "mcFadeIn 0.3s ease" : "none" }} key={activePanel}>

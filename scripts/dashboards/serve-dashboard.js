@@ -34,6 +34,16 @@ const ALLOWED_JOBS = {
 const jobRunning = {};  // { [jobId]: true } while job is active
 const jobHistory = [];  // ring buffer – last 20 runs
 
+// ── SSE (Server-Sent Events) ─────────────────────────────────────────────
+const sseClients = new Set();  // connected browser tabs
+
+function pushEvent(type, data) {
+  const msg = `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of [...sseClients]) {
+    try { client.write(msg); } catch { sseClients.delete(client); }
+  }
+}
+
 // config.json / github-registry.json / linux-projects.json の候補パス
 const CONFIG_CANDIDATES = [
   path.join(__dirname, '..', '..', 'config'),
@@ -1015,6 +1025,7 @@ function handleJobRun(req, res) {
     const entry = { jobId, startAt, status: 'running', endAt: null, exitCode: null, output: '' };
     jobHistory.push(entry);
     if (jobHistory.length > 20) jobHistory.shift();
+    pushEvent('job-update', { jobId, status: 'running', startAt });
 
     const child = spawn(job.cmd, job.args, { cwd: PROJ_ROOT, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
@@ -1027,6 +1038,7 @@ function handleJobRun(req, res) {
       entry.endAt = new Date().toISOString();
       entry.output = out.slice(-500);
       jobRunning[jobId] = false;
+      pushEvent('job-update', { jobId, status: 'timeout', startAt, endAt: entry.endAt });
     }, job.timeout * 1000);
 
     child.on('close', code => {
@@ -1036,6 +1048,7 @@ function handleJobRun(req, res) {
       entry.endAt = new Date().toISOString();
       entry.output = out.slice(-500);
       jobRunning[jobId] = false;
+      pushEvent('job-update', { jobId, status: entry.status, exitCode: code, startAt, endAt: entry.endAt });
     });
 
     res.writeHead(202, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1051,6 +1064,75 @@ function handleJobStatus(res) {
     jobs:      Object.keys(ALLOWED_JOBS),
     generated: new Date().toISOString(),
   }, null, 2));
+}
+
+function handleSSE(req, res) {
+  res.writeHead(200, {
+    'Content-Type':                'text/event-stream',
+    'Cache-Control':               'no-cache',
+    'Connection':                  'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+    'X-Accel-Buffering':           'no',
+  });
+  res.write('retry: 3000\n\n');
+  sseClients.add(res);
+
+  // Send current state immediately on connect
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(PROJ_ROOT, 'state.json'), 'utf8'));
+    res.write(`event: state-change\ndata: ${JSON.stringify({
+      phase:       s.execution?.phase || '—',
+      goal:        s.goal?.title || (typeof s.goal === 'string' ? s.goal : '—'),
+      stable:      s.stable?.stable_achieved || false,
+      consecutive: s.stable?.consecutive_success || 0,
+    })}\n\n`);
+  } catch {}
+
+  const heartbeat = setInterval(() => {
+    try { res.write(': heartbeat\n\n'); } catch { clearInterval(heartbeat); sseClients.delete(res); }
+  }, 15000);
+
+  req.on('close', () => { clearInterval(heartbeat); sseClients.delete(res); });
+}
+
+function watchFiles() {
+  // ── state.json 監視 ────────────────────────────────────────────────────
+  const stateFile = path.join(PROJ_ROOT, 'state.json');
+  let lastStateContent = '';
+  fs.watchFile(stateFile, { interval: 2000 }, () => {
+    try {
+      const content = fs.readFileSync(stateFile, 'utf8');
+      if (content === lastStateContent) return;
+      lastStateContent = content;
+      const s = JSON.parse(content);
+      pushEvent('state-change', {
+        phase:       s.execution?.phase || '—',
+        goal:        s.goal?.title || (typeof s.goal === 'string' ? s.goal : '—'),
+        stable:      s.stable?.stable_achieved || false,
+        consecutive: s.stable?.consecutive_success || 0,
+      });
+    } catch {}
+  });
+
+  // ── dashboard.log テール監視 ────────────────────────────────────────────
+  const logFile = path.join(os.homedir(), '.claudeos', 'dashboard.log');
+  let logOffset = 0;
+  try { logOffset = fs.statSync(logFile).size; } catch {}
+  fs.watchFile(logFile, { interval: 1000 }, () => {
+    try {
+      const stat = fs.statSync(logFile);
+      if (stat.size <= logOffset) { logOffset = stat.size; return; }
+      const fd  = fs.openSync(logFile, 'r');
+      const buf = Buffer.alloc(stat.size - logOffset);
+      fs.readSync(fd, buf, 0, buf.length, logOffset);
+      fs.closeSync(fd);
+      logOffset = stat.size;
+      const lines = buf.toString('utf8').split('\n').filter(Boolean);
+      for (const line of lines) {
+        pushEvent('log-line', { line, at: new Date().toISOString() });
+      }
+    } catch {}
+  });
 }
 
 if (typeof module !== 'undefined') {
@@ -1087,6 +1169,7 @@ if (require.main === module) {
     }
     if (req.method === 'POST' && req.url === '/api/jobs') { return handleJobRun(req, res); }
     if (req.url === '/api/jobs/status')                    { return handleJobStatus(res); }
+    if (req.url === '/api/events')                         { return handleSSE(req, res); }
     if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());
@@ -1102,6 +1185,7 @@ if (require.main === module) {
     console.log(`[Dashboard] GITHUB_REGISTRY: ${Object.keys(GITHUB_REGISTRY).length} entries`);
     console.log(`[Dashboard] CRON_REG: ${CRON_REG}`);
     console.log('[Dashboard] Ctrl+C to stop');
+    watchFiles();
   });
 
   server.on('error', e => {
