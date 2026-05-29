@@ -464,6 +464,7 @@ const NAV_ITEMS = [
   { id:"projects",  icon:"📁", label:"Projects" },
   { id:"dashboard", icon:"📊", label:"ダッシュボード" },
   { id:"agents",    icon:"🤖", label:"Agent Teams" },
+  { id:"jobs",      icon:"⚙️", label:"Jobs" },
   { id:"cicd",      icon:"⚡", label:"CI / GitHub" },
   { id:"cron",      icon:"🕐", label:"Cron管理" },
   { id:"boot",      icon:"🚀", label:"Boot Sequence" },
@@ -1032,6 +1033,160 @@ const AgentChain = ({ phase }) => {
   );
 };
 window.AgentsPanel = AgentsPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 5.5: Jobs Panel (固定ジョブ実行・管制塔)
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+const JOB_META = {
+  'audit-scan':         { label: 'Audit Scan',         icon: '🗄️', desc: '変更証跡収集' },
+  'cmdb-scan':          { label: 'CMDB Scan',          icon: '📊', desc: '構成アイテム差分' },
+  'sync-issues':        { label: 'Sync Issues',        icon: '🔄', desc: 'GitHub Issues 同期' },
+  'agent-teams-status': { label: 'Agent Teams Status', icon: '🤖', desc: 'Agent Teams 状態確認' },
+  'gitleaks-run':       { label: 'Gitleaks Scan',      icon: '🔐', desc: 'シークレット検出' },
+};
+
+function JobsPanel() {
+  const [status, setStatus] = React.useState({ running: {}, history: [], jobs: [] });
+  const [error, setError]   = React.useState(null);
+  const [busy, setBusy]     = React.useState({});
+
+  const fetchStatus = React.useCallback(() => {
+    fetch('/api/jobs/status')
+      .then(r => r.json())
+      .then(d => { setStatus(d); setError(null); })
+      .catch(e => setError(e.message));
+  }, []);
+
+  React.useEffect(() => {
+    fetchStatus();
+    const tid = setInterval(fetchStatus, 3000);
+    return () => clearInterval(tid);
+  }, [fetchStatus]);
+
+  const runJob = (jobId) => {
+    if (status.running[jobId] || busy[jobId]) return;
+    setBusy(b => ({ ...b, [jobId]: true }));
+    fetch('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) setError(d.error);
+        setTimeout(fetchStatus, 600);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setBusy(b => ({ ...b, [jobId]: false })));
+  };
+
+  const jobs = status.jobs.length > 0 ? status.jobs : Object.keys(JOB_META);
+
+  const cardStyle = {
+    border: `1px solid ${MC.border}`,
+    borderRadius: 8,
+    padding: 14,
+    background: MC.bgPanel,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  };
+
+  const btnStyle = (isActive) => ({
+    padding: '6px 14px',
+    fontSize: 12,
+    borderRadius: 4,
+    border: 'none',
+    cursor: isActive ? 'not-allowed' : 'pointer',
+    background: isActive ? MC.textMuted : MC.accent,
+    color: '#fff',
+    opacity: isActive ? 0.6 : 1,
+    fontFamily: MC.mono,
+    transition: 'opacity 0.15s',
+  });
+
+  return (
+    <div style={{ padding: 16 }}>
+      <h2 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600, color: MC.text }}>⚙️ Fixed Jobs</h2>
+      <p style={{ marginBottom: 16, fontSize: 12, color: MC.textDim }}>
+        CLIスクリプトを許可リスト方式で実行します。任意コマンドの注入はできません。
+      </p>
+
+      {/* ── Job cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 12, marginBottom: 28 }}>
+        {jobs.map(jobId => {
+          const meta      = JOB_META[jobId] || { label: jobId, icon: '⚙️', desc: '' };
+          const isRunning = status.running[jobId] || busy[jobId];
+          const lastRun   = [...status.history].reverse().find(h => h.jobId === jobId);
+          const dot       = isRunning ? '⏳'
+                          : lastRun?.status === 'done'    ? '✅'
+                          : lastRun?.status === 'failed'  ? '❌'
+                          : lastRun?.status === 'timeout' ? '⏰'
+                          : '⚪';
+          return (
+            <div key={jobId} style={cardStyle}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: MC.text }}>
+                {meta.icon} {meta.label}
+              </div>
+              <div style={{ fontSize: 11, color: MC.textMuted }}>{meta.desc}</div>
+              {lastRun && (
+                <div style={{ fontSize: 11, color: MC.textDim }}>
+                  {dot} {lastRun.status}
+                  {lastRun.exitCode !== null && lastRun.exitCode !== 0 && (
+                    <span style={{ color: '#f66', marginLeft: 4 }}>exit:{lastRun.exitCode}</span>
+                  )}
+                  {lastRun.endAt && <span style={{ marginLeft: 4 }}>{lastRun.endAt.slice(11, 19)}</span>}
+                </div>
+              )}
+              <button style={btnStyle(isRunning)} onClick={() => runJob(jobId)} disabled={isRunning}>
+                {isRunning ? '⏳ Running…' : '▶ Run'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── History table ── */}
+      {status.history.length > 0 && (
+        <>
+          <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: MC.textDim }}>📋 Recent Runs</h3>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', fontFamily: MC.mono }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${MC.border}` }}>
+                {['Job', 'Status', 'Started', 'Ended', 'Exit'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '4px 10px', color: MC.textDim, fontWeight: 500 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[...status.history].reverse().slice(0, 10).map((h, i) => {
+                const m   = JOB_META[h.jobId] || { icon: '⚙️' };
+                const dot = h.status === 'done'    ? '✅'
+                          : h.status === 'failed'  ? '❌'
+                          : h.status === 'running' ? '⏳'
+                          : h.status === 'timeout' ? '⏰' : '⚪';
+                return (
+                  <tr key={i} style={{ borderBottom: `1px solid ${MC.bgPanel}` }}>
+                    <td style={{ padding: '4px 10px', color: MC.text }}>{m.icon} {h.jobId}</td>
+                    <td style={{ padding: '4px 10px' }}>{dot} {h.status}</td>
+                    <td style={{ padding: '4px 10px', color: MC.textMuted }}>{h.startAt?.slice(11, 19) || '—'}</td>
+                    <td style={{ padding: '4px 10px', color: MC.textMuted }}>{h.endAt?.slice(11, 19) || '…'}</td>
+                    <td style={{ padding: '4px 10px', color: h.exitCode ? '#f66' : MC.textMuted }}>{h.exitCode ?? '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {error && <div style={{ color: '#f66', marginTop: 10, fontSize: 12 }}>❌ {error}</div>}
+    </div>
+  );
+}
+window.JobsPanel = JobsPanel;
   </script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -1819,6 +1974,7 @@ const App = () => {
       case "projects":  return <ProjectsPanel />;
       case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} liveData={liveData} />;
       case "agents":    return <AgentsPanel state={state} liveData={liveData} agentTeamsActivity={agentTeamsActivity} />;
+      case "jobs":      return <JobsPanel />;
       case "cicd":      return <CICDPanel liveData={liveData} />;
       case "cron":      return <CronPanel liveData={liveData} />;
       case "boot":      return <BootPanel state={state} liveData={liveData} />;

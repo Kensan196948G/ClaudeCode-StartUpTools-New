@@ -14,7 +14,7 @@ const http    = require('http');
 const fs      = require('fs');
 const path    = require('path');
 const os      = require('os');
-const { exec, execSync } = require('child_process');
+const { exec, execSync, spawn } = require('child_process');
 const { promisify } = require('util');
 const execAsync     = promisify(exec);
 
@@ -22,6 +22,17 @@ const PORT         = parseInt(process.argv.find(a => a.match(/^\d+$/)) || '3737'
 const CRON_REG     = path.join(os.homedir(), '.claudeos', 'cron-registry.json');
 const SESSIONS_DIR = path.join(os.homedir(), '.claudeos', 'sessions');
 const PROJ_ROOT    = path.resolve(__dirname, '..', '..');
+
+// ── Fixed Job execution (POST /api/jobs) ────────────────────────────────────
+const ALLOWED_JOBS = {
+  'audit-scan':         { cmd: 'node',     args: ['scripts/tools/run-audit-scan.js'],                           timeout: 30 },
+  'cmdb-scan':          { cmd: 'node',     args: ['scripts/tools/run-cmdb-scan.js'],                            timeout: 20 },
+  'sync-issues':        { cmd: 'pwsh',     args: ['-NonInteractive', '-File', 'scripts/tools/Sync-Issues.ps1'], timeout: 30 },
+  'agent-teams-status': { cmd: 'node',     args: ['scripts/tools/agent-teams-status.js'],                       timeout: 10 },
+  'gitleaks-run':       { cmd: 'gitleaks', args: ['detect', '--source', '.', '--exit-code', '0'],               timeout: 30 },
+};
+const jobRunning = {};  // { [jobId]: true } while job is active
+const jobHistory = [];  // ring buffer – last 20 runs
 
 // config.json / github-registry.json / linux-projects.json の候補パス
 const CONFIG_CANDIDATES = [
@@ -977,6 +988,71 @@ function handleMissionControl(res) {
 }
 
 // Export for testing (must be before server start guard)
+// ── Job execution handlers ────────────────────────────────────────────────
+function handleJobRun(req, res) {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    let jobId;
+    try { jobId = JSON.parse(body).jobId; } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      return;
+    }
+    if (!jobId || !ALLOWED_JOBS[jobId]) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unknown jobId', allowed: Object.keys(ALLOWED_JOBS) }));
+      return;
+    }
+    if (jobRunning[jobId]) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Job already running', jobId }));
+      return;
+    }
+    const job = ALLOWED_JOBS[jobId];
+    jobRunning[jobId] = true;
+    const startAt = new Date().toISOString();
+    const entry = { jobId, startAt, status: 'running', endAt: null, exitCode: null, output: '' };
+    jobHistory.push(entry);
+    if (jobHistory.length > 20) jobHistory.shift();
+
+    const child = spawn(job.cmd, job.args, { cwd: PROJ_ROOT, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', d => { out += d.toString(); });
+    child.stderr.on('data', d => { out += d.toString(); });
+
+    const timer = setTimeout(() => {
+      child.kill();
+      entry.status = 'timeout';
+      entry.endAt = new Date().toISOString();
+      entry.output = out.slice(-500);
+      jobRunning[jobId] = false;
+    }, job.timeout * 1000);
+
+    child.on('close', code => {
+      clearTimeout(timer);
+      entry.status = code === 0 ? 'done' : 'failed';
+      entry.exitCode = code;
+      entry.endAt = new Date().toISOString();
+      entry.output = out.slice(-500);
+      jobRunning[jobId] = false;
+    });
+
+    res.writeHead(202, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, jobId, startAt }));
+  });
+}
+
+function handleJobStatus(res) {
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+  res.end(JSON.stringify({
+    running:   jobRunning,
+    history:   jobHistory.slice(-20),
+    jobs:      Object.keys(ALLOWED_JOBS),
+    generated: new Date().toISOString(),
+  }, null, 2));
+}
+
 if (typeof module !== 'undefined') {
   module.exports = { getAllProjects, getRegisteredProjects, buildProjectData, buildTimeline, weeksToPhase };
 }
@@ -984,11 +1060,12 @@ if (typeof module !== 'undefined') {
 // Start server only when run directly (not when required by tests)
 if (require.main === module) {
   const server = http.createServer((req, res) => {
-    // localhost only — reject other origins
-    const host = req.headers.host || '';
-    if (!host.startsWith('localhost') && !host.startsWith('127.0.0.1')) {
-      res.writeHead(403); res.end('Forbidden'); return;
-    }
+    // CORS for LAN access (dashboard is local-network only, no external exposure)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
     if (req.url === '/health' || req.url === '/api/health') {
       const ts = readTrustScore();
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -1008,13 +1085,18 @@ if (require.main === module) {
       }
       return;
     }
+    if (req.method === 'POST' && req.url === '/api/jobs') { return handleJobRun(req, res); }
+    if (req.url === '/api/jobs/status')                    { return handleJobStatus(res); }
     if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());
   });
 
-  server.listen(PORT, '127.0.0.1', () => {
-    console.log(`[Dashboard] http://localhost:${PORT}`);
+  server.listen(PORT, '0.0.0.0', () => {
+    const lanIp = Object.values(os.networkInterfaces()).flat()
+      .find(i => i && i.family === 'IPv4' && !i.internal)?.address || '(unavailable)';
+    console.log(`[Dashboard] Local: http://localhost:${PORT}`);
+    console.log(`[Dashboard] LAN:   http://${lanIp}:${PORT}`);
     console.log(`[Dashboard] PROJECTS_DIR: ${PROJECTS_DIR}`);
     console.log(`[Dashboard] LINUX_PROJECTS: ${LINUX_PROJECTS.length} entries`);
     console.log(`[Dashboard] GITHUB_REGISTRY: ${Object.keys(GITHUB_REGISTRY).length} entries`);
