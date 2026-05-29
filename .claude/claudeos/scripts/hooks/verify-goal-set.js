@@ -35,6 +35,8 @@ const REQUIRED_KEYWORDS = [
   "GitHub Projects",
   "stop after",
   "DynamicWorkflows",
+  "CodeRabbit",
+  "security",
 ];
 
 function findStartPrompt() {

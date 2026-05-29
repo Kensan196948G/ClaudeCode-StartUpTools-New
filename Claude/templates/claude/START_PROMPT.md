@@ -1,4 +1,4 @@
-/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。大規模監査・横断調査・多観点設計の場面ではDynamicWorkflows機能（deep-research等）もtoken使用率70%未満かつ残り60分以上を条件に積極活用してください（ultracode既定化は禁止）。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
+/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。大規模監査・横断調査・多観点設計の場面ではDynamicWorkflows機能（deep-research等）もtoken使用率70%未満かつ残り60分以上を条件に積極活用してください（ultracode既定化は禁止）。VerifyフェーズではCodeRabbit review・Codex review（利用可能時）・security scan（gitleaks/secret検出/npm audit）を必ず実施しSTABLE判定の前提としてください。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
 
 # 🚀 ClaudeOS Boot Loader v9.0
 
@@ -95,6 +95,6 @@ claude agents
 
 - Goal Driven（冒頭の /goal が全行動の基準）
 - Security First
-- Verify Mandatory
+- Verify Mandatory: **CodeRabbit review** / **Codex review（利用可能時）** / **security scan（gitleaks・secret・npm audit）** を必ず実施し STABLE 判定の前提とする（詳細: `core/14-codex-review.md` / `core/15-coderabbit-review.md` / governance `19-security-policy.md`。ultrareview〔Gate-2b〕は課金・人手起動のため自律ループでは自動実行しない）
 - Stop Infinite Repair
 - CTO Final Decision
