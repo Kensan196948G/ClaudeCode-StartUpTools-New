@@ -1,4 +1,4 @@
-/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。大規模監査・横断調査・多観点設計の場面ではDynamicWorkflows機能（deep-research等）もtoken残量70%未満かつ残り60分以上を条件に積極活用してください（ultracode既定化は禁止）。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
+/goal "全てをCTOの判断に任せます。CTO全権委任で自律開発ループを続けてください。設定されたMonitor、Development、Verify、Improvementをループ（ループ回数はCTO判断でOKです。）で進めてください。AgentTeams機能を大いに活用してください。大規模監査・横断調査・多観点設計の場面ではDynamicWorkflows機能（deep-research等）もtoken使用率70%未満かつ残り60分以上を条件に積極活用してください（ultracode既定化は禁止）。Auto Mode による自律開発を実行してください。全プロセスや状況を可視化してください。今から5時間までの作業とし30分前には必ず終了処理に入ってください。ドキュメントファイルも常に確認・更新してください。README.mdは分かりやすく、表とアイコン多用、ダイアグラム図も活用して常に更新してください。GitHub Projectsも常に更新してください。or stop after 30 turns"
 
 # 🚀 ClaudeOS Boot Loader v9.0
 
