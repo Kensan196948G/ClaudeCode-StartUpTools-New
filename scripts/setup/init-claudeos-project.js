@@ -53,11 +53,12 @@ const SKILLS_DIRTY       = ".claude/claudeos/.skills-dirty";
 
 // ──────────────────────────────────────────────────────────────────────
 function parseArgs(argv) {
-  const args = { mode: null, target: null, projectFilter: null, configPath: null };
+  const args = { mode: null, target: null, projectFilter: null, configPath: null, all: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if      (a === "--dry-run")  args.mode = "dry-run";
     else if (a === "--apply")    args.mode = "apply";
+    else if (a === "--all")      args.all = true;
     else if (a === "--target")   args.target = argv[++i];
     else if (a === "--project")  args.projectFilter = argv[++i];
     else if (a === "--config")   args.configPath = argv[++i];
@@ -68,8 +69,8 @@ function parseArgs(argv) {
     printHelp();
     process.exit(2);
   }
-  if (!args.target && !args.projectFilter) {
-    console.error("ERROR: must specify --target <path> or --project <name>");
+  if (!args.all && !args.target && !args.projectFilter) {
+    console.error("ERROR: must specify --target <path>, --project <name>, or --all");
     printHelp();
     process.exit(2);
   }
@@ -83,10 +84,13 @@ init-claudeos-project.js — install ClaudeOS into a project that does not have 
 Usage:
   node scripts/setup/init-claudeos-project.js --target <path> --dry-run
   node scripts/setup/init-claudeos-project.js --project <name> --apply
+  node scripts/setup/init-claudeos-project.js --all --dry-run        # 全プロジェクト監査 (read-only)
+  node scripts/setup/init-claudeos-project.js --all --apply          # 全プロジェクト一括導入/補完
 
 Options:
   --target <path>   Absolute/relative path to the target project directory
   --project <name>  Resolve target via config/linux-projects.json or config/config.json
+  --all             config の base 直下の全ディレクトリを対象 (.claude 非依存・監査/一括導入)
   --config <path>   Explicit config path (default: auto-detect)
 
 Semantics: copy-if-missing (never overwrites existing files), idempotent.
@@ -116,6 +120,27 @@ function resolveTargetPath(args) {
   if (!base) { console.error(`ERROR: ${cfgPath} has neither basePath nor projectsDir`); process.exit(3); }
   console.log(`[resolve] config: ${cfgPath}`);
   return path.join(base, args.projectFilter);
+}
+
+// --all 用: config の base (basePath/projectsDir) 直下の全ディレクトリを列挙 (.claude 非依存)
+function listAllProjectDirs(configPath) {
+  const candidates = configPath ? [configPath] : [
+    path.join(process.cwd(), "config", "config.json"),
+    path.join(process.cwd(), "config", "linux-projects.json"),
+  ];
+  let cfgPath = null;
+  for (const c of candidates) { if (fs.existsSync(c)) { cfgPath = c; break; } }
+  if (!cfgPath) { console.error(`ERROR: no config found. Tried: ${candidates.join(", ")}`); process.exit(3); }
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(cfgPath, "utf8")); }
+  catch (e) { console.error(`ERROR: failed to parse ${cfgPath}: ${e.message}`); process.exit(3); }
+  const base = cfg.basePath || cfg.projectsDir;
+  if (!base) { console.error(`ERROR: ${cfgPath} has neither basePath nor projectsDir`); process.exit(3); }
+  console.log(`[resolve] config: ${cfgPath}  base: ${base}`);
+  let entries = [];
+  try { entries = fs.readdirSync(base, { withFileTypes: true }); }
+  catch (e) { console.error(`ERROR: cannot read base dir ${base}: ${e.message}`); process.exit(3); }
+  return entries.filter(e => e.isDirectory()).map(e => path.join(base, e.name));
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -205,24 +230,12 @@ function mergeSettings(srcPath, destPath, plan, dryRun) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-function main() {
-  const args       = parseArgs(process.argv.slice(2));
-  const targetPath = resolveTargetPath(args);
-  const projName   = path.basename(targetPath);
-  const dryRun     = args.mode === "dry-run";
-  const tag        = dryRun ? "[DRY-RUN]" : "[APPLY]";
-
-  if (!fs.existsSync(targetPath)) {
-    console.error(`ERROR: target project directory not found: ${targetPath}`);
-    process.exit(4);
-  }
-
-  console.log(`[init] target : ${targetPath}`);
-  console.log(`[init] project: ${projName}`);
-  console.log(`[init] mode   : ${args.mode}`);
-  console.log("");
-
-  const totals = { create: 0, skip: 0, merge: 0, srcMissing: [] };
+// 1 プロジェクトを処理し totals を返す。quiet=true でマッピング毎の行出力を抑制 (--all 監査用)。
+function processProject(targetPath, dryRun, quiet) {
+  const projName = path.basename(targetPath);
+  const tag      = dryRun ? "[DRY-RUN]" : "[APPLY]";
+  const log      = quiet ? () => {} : (m) => console.log(m);
+  const totals   = { create: 0, skip: 0, merge: 0, srcMissing: [] };
 
   for (const m of MAPPINGS) {
     const src  = path.join(REPO_ROOT, m.src);
@@ -233,11 +246,10 @@ function main() {
     totals.create += plan.create;
     totals.skip   += plan.skip;
     totals.srcMissing.push(...plan.srcMissing);
-    const note = plan.srcMissing.length ? " (SOURCE MISSING!)" : "";
-    console.log(`  ${tag} ${m.label}: +${plan.create} new / ${plan.skip} kept${note}`);
+    log(`  ${tag} ${m.label}: +${plan.create} new / ${plan.skip} kept${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
   }
 
-  // settings.json を deep-merge (既存の permissions/env を保護しつつ ClaudeOS の hooks 登録 + env を補完)
+  // settings.json を deep-merge (permissions/env 保護しつつ ClaudeOS の hooks 登録 + env を補完)
   {
     const src  = path.join(REPO_ROOT, SETTINGS_TEMPLATE);
     const dest = path.join(targetPath, ".claude/settings.json");
@@ -245,7 +257,7 @@ function main() {
     mergeSettings(src, dest, plan, dryRun);
     totals.create += plan.create; totals.skip += plan.skip; totals.merge += plan.merge; totals.srcMissing.push(...plan.srcMissing);
     const detail = plan.create ? "+1 new" : (plan.merge ? `+${plan.merge} merged (hooks/env)` : "up-to-date (kept)");
-    console.log(`  ${tag} .claude/settings.json: ${detail}${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
+    log(`  ${tag} .claude/settings.json: ${detail}${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
   }
 
   // state.json を seed (YOUR_PROJECT → 実プロジェクト名に置換)
@@ -255,18 +267,72 @@ function main() {
     const plan = { create: 0, skip: 0, srcMissing: [] };
     copyFileIfMissing(src, dest, plan, dryRun, (txt) => txt.replace(/"YOUR_PROJECT"/g, JSON.stringify(projName)));
     totals.create += plan.create; totals.skip += plan.skip; totals.srcMissing.push(...plan.srcMissing);
-    console.log(`  ${tag} state.json (name=${projName}): +${plan.create} new / ${plan.skip} kept${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
+    log(`  ${tag} state.json (name=${projName}): +${plan.create} new / ${plan.skip} kept${plan.srcMissing.length ? " (SOURCE MISSING!)" : ""}`);
   }
 
-  // skills を配置したので .skills-dirty を touch → 次セッションで reloadSkills 発火
+  // skills 配置後に .skills-dirty を touch → 次セッションで reloadSkills 発火
   if (!dryRun && totals.create > 0) {
     try {
       const sentinel = path.join(targetPath, SKILLS_DIRTY);
       fs.mkdirSync(path.dirname(sentinel), { recursive: true });
       fs.writeFileSync(sentinel, new Date().toISOString() + "\n", "utf8");
-      console.log(`  [APPLY] touched ${SKILLS_DIRTY} (次セッションで skill 再スキャン)`);
+      log(`  [APPLY] touched ${SKILLS_DIRTY} (次セッションで skill 再スキャン)`);
     } catch (e) { console.error(`  WARN: failed to touch sentinel: ${e.message}`); }
   }
+
+  return totals;
+}
+
+// --all 監査の分類ラベル
+function classify(t) {
+  if (t.srcMissing.length)                  return "SRC-MISSING";
+  if (t.create === 0 && t.merge === 0)      return "OK (complete)";
+  if (t.create >= 100)                      return `UN-ONBOARDED (create=${t.create})`;
+  if (t.create > 0)                         return `PARTIAL (create=${t.create} merge=${t.merge})`;
+  return `SETTINGS-GAP (merge=${t.merge})`;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+function main() {
+  const args   = parseArgs(process.argv.slice(2));
+  const dryRun = args.mode === "dry-run";
+
+  // --all: config の base 直下を全走査 (.claude 非依存)。dry-run=監査 / apply=一括導入。
+  if (args.all) {
+    const dirs     = listAllProjectDirs(args.configPath);
+    const selfName = path.basename(process.cwd());
+    console.log(`[init --all] mode: ${args.mode}  dirs: ${dirs.length} (self "${selfName}" excluded)`);
+    console.log("");
+    const agg = {};
+    for (const d of dirs) {
+      const n = path.basename(d);
+      if (n === selfName) continue;
+      const t   = processProject(d, dryRun, true);   // quiet
+      const cls = classify(t);
+      const key = cls.split(" ")[0];
+      agg[key]  = (agg[key] || 0) + 1;
+      console.log(`  ${n.padEnd(48)} ${cls}`);
+    }
+    console.log("");
+    console.log("─".repeat(72));
+    console.log(`Summary (${dryRun ? "audit" : "applied"}): ${Object.entries(agg).map(([k, v]) => `${k}=${v}`).join("  ")}`);
+    if (dryRun) console.log("適用: --all --apply (copy-if-missing + settings deep-merge / 既存保護 / backup / 冪等)。");
+    return;
+  }
+
+  // 単一プロジェクト (verbose)
+  const targetPath = resolveTargetPath(args);
+  const projName   = path.basename(targetPath);
+  if (!fs.existsSync(targetPath)) {
+    console.error(`ERROR: target project directory not found: ${targetPath}`);
+    process.exit(4);
+  }
+  console.log(`[init] target : ${targetPath}`);
+  console.log(`[init] project: ${projName}`);
+  console.log(`[init] mode   : ${args.mode}`);
+  console.log("");
+
+  const totals = processProject(targetPath, dryRun, false);
 
   console.log("");
   console.log("─".repeat(60));
