@@ -302,11 +302,20 @@ function main() {
     const dirs     = listAllProjectDirs(args.configPath);
     const selfName = path.basename(process.cwd());
     console.log(`[init --all] mode: ${args.mode}  dirs: ${dirs.length} (self "${selfName}" excluded)`);
+    if (!dryRun) console.log(`[init --all] --apply は既存 ClaudeOS プロジェクト (.claude/claudeos あり) のみ対象。未導入 dir は skip。`);
     console.log("");
     const agg = {};
     for (const d of dirs) {
       const n = path.basename(d);
       if (n === selfName) continue;
+      const onboarded = fs.existsSync(path.join(d, ".claude", "claudeos"));
+      // --apply ガード: .claude/claudeos が無い dir (.pytest_cache / アーカイブ等) は
+      // onboard せず skip し litter を防ぐ。新規 onboard は --project <name> --apply を明示使用。
+      if (!dryRun && !onboarded) {
+        agg["SKIP-NEW"] = (agg["SKIP-NEW"] || 0) + 1;
+        console.log(`  ${n.padEnd(48)} SKIP-NEW (no .claude/claudeos — onboard: --project ${n} --apply)`);
+        continue;
+      }
       const t   = processProject(d, dryRun, true);   // quiet
       const cls = classify(t);
       const key = cls.split(" ")[0];
@@ -316,7 +325,7 @@ function main() {
     console.log("");
     console.log("─".repeat(72));
     console.log(`Summary (${dryRun ? "audit" : "applied"}): ${Object.entries(agg).map(([k, v]) => `${k}=${v}`).join("  ")}`);
-    if (dryRun) console.log("適用: --all --apply (copy-if-missing + settings deep-merge / 既存保護 / backup / 冪等)。");
+    if (dryRun) console.log("適用: --all --apply は既存 ClaudeOS projects のみ完成 (未導入 dir は skip / 既存保護 / backup / 冪等)。");
     return;
   }
 
