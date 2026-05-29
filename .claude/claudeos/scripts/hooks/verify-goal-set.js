@@ -34,6 +34,7 @@ const REQUIRED_KEYWORDS = [
   "README",
   "GitHub Projects",
   "stop after",
+  "DynamicWorkflows",
 ];
 
 function findStartPrompt() {
@@ -120,7 +121,7 @@ if (missing.length > 0) {
   console.log(`  ⚠️ テンプレ整合性警告: 必須キーワード欠落 = ${missing.join(", ")}`);
   console.log("     → START_PROMPT.md の /goal 文面を見直してください");
 } else {
-  console.log("  ✅ 必須キーワード 8/8 整合");
+  console.log(`  ✅ 必須キーワード ${REQUIRED_KEYWORDS.length}/${REQUIRED_KEYWORDS.length} 整合`);
 }
 
 console.log("");
