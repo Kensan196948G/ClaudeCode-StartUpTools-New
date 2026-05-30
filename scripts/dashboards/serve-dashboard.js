@@ -1178,7 +1178,8 @@ function handleSystemHealth(res) {
   c.corsEnabled  = true;
   c.authEnabled  = !!AUTH_PASS;  // true when DASHBOARD_PASSWORD env or config.json.dashboardAuth set
   // Job history persistence
-  c.jobHistoryPersisted = fs.existsSync(JOB_HISTORY_FILE);
+  // JOB_HISTORY_FILE が定義されていれば永続化コードが有効（ファイル未生成でも true）
+  c.jobHistoryPersisted = typeof JOB_HISTORY_FILE === 'string' && JOB_HISTORY_FILE.length > 0;
   // Untracked files
   try {
     const out = execSync('git ls-files --others --exclude-standard', { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 5000 });
