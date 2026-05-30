@@ -1229,6 +1229,10 @@ function handleSystemHealth(res) {
     c.stableAchieved  = s.stable?.stable_achieved || false;
   } catch { c.currentPhase = '—'; }
 
+  // Server process info
+  c.serverUptimeSec = Math.floor(process.uptime());
+  c.serverVersion   = '3.3.4';  // Update on each release
+
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
   res.end(JSON.stringify({ checks: c, generated: new Date().toISOString() }, null, 2));
 }

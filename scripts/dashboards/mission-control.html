@@ -1313,6 +1313,8 @@ const HEALTH_ITEMS = [
   { key:'currentPhase',         label:'現在フェーズ',           warn: () => false, icon:'🔁', warnMsg: v => v, okMsg: v => v },
   { key:'stableAchieved',       label:'STABLE',                warn: v => !v,    icon:'✅', warnMsg:'未達成', okMsg:'達成済み' },
   { key:'deployReady',          label:'Deploy Ready',          warn: () => false, icon:'🚀', warnMsg:'未設定', okMsg:'準備完了 🚀' },
+  { key:'serverUptimeSec',      label:'サーバー稼働時間',        warn: () => false, icon:'🖥️', warnMsg: v => `${v}秒`, okMsg: v => `${Math.floor(v/60)}分 稼働中` },
+  { key:'serverVersion',        label:'サーバーバージョン',       warn: () => false, icon:'🔖', warnMsg: v => v, okMsg: v => v },
 ];
 
 function SystemHealthPanel() {
