@@ -1,7 +1,3 @@
----
-description: ID 指定または全指定で CLAUDEOS Cron エントリを解除する
----
-
 # /cron-cancel — Cron エントリ解除
 
 引数:

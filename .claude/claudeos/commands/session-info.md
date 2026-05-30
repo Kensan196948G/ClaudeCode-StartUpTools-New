@@ -1,7 +1,3 @@
----
-description: 現セッションの session.json を整形表示する
----
-
 # /session-info — セッション情報
 
 ```bash

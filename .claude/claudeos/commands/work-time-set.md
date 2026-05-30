@@ -1,7 +1,3 @@
----
-description: 現セッションの最大作業時間 (max_duration_minutes) を変更する
----
-
 # /work-time-set — 作業時間の変更
 
 引数:

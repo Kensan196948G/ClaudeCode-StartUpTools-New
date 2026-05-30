@@ -1,7 +1,3 @@
----
-description: 現在の CLAUDEOS Cron エントリ一覧を表示する
----
-
 # /cron-list — Cron エントリ一覧
 
 ```bash

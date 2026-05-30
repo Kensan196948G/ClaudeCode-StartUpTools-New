@@ -1,7 +1,3 @@
----
-description: Linux crontab に CLAUDEOS 週次自動起動エントリを登録する
----
-
 # /cron-register — Cron エントリ登録
 
 以下の手順で crontab を更新してください。
