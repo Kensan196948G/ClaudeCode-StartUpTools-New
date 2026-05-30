@@ -2,6 +2,28 @@
 
 # CHANGELOG
 
+## [v3.3.7] - 2026-05-30 — プロジェクト別 CI/PR/Issues 実データ表示
+
+### 🎯 概要
+CI/GitHub パネルで全 Cron 登録プロジェクトの実 GitHub データをリアルタイム取得。Classic PAT 不要 — 既存 `gh auth` を活用。
+
+### 🔧 変更対象
+
+| ファイル | 変更内容 |
+|---|---|
+| `serve-dashboard.js` | `fetchProjectCiData()` / GET `/api/project-ci?repo=owner/repo` 追加（セキュリティバリデーション付き）|
+| `mission-control.html` | プロジェクト選択 → `/api/project-ci` 非同期取得 / PR マージ状態表示強化 |
+
+### ✅ 主な改善内容
+
+- **プロジェクト選択**: 8 Cron プロジェクト（GitHub URL 保持）を選択可能
+- **実データ表示**: CI ワークフロー / PR（マージ状態付き）/ Issues
+- **認証**: `gh auth login` 済みトークンで全プロジェクトアクセス — ClassicPAT 不要
+- **キャッシュ**: per-project 30秒キャッシュで API レート制限を回避
+- **セキュリティ**: `owner/repo` フォーマット正規表現バリデーション
+
+---
+
 ## [v3.3.6] - 2026-05-30 — Mission Control 6項目 UI 大幅改善
 
 ### 🎯 概要

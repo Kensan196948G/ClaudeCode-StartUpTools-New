@@ -51,7 +51,7 @@
 
 | 項目 | 状態 |
 |------|------|
-| バージョン | **v3.3.6** (Mission Control 6項目 UI 改善) — 旧: v3.3.5 |
+| バージョン | **v3.3.7** (プロジェクト別 CI/PR/Issues 実データ表示) — 旧: v3.3.6 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |
