@@ -284,7 +284,8 @@ flowchart TD
 | 🐍 PTY Bridge | 🔧 共通 | SSH経由の Claude Code 操作を堅牢にサポート |
 | ⚙️ 一元設定 | 🔧 共通 | `config/config.json` で対応ツールを一元管理 |
 | 🩺 診断ツール | 🔧 共通 | `Test-AllTools.ps1` で環境を一括チェック |
-| ⚡ CI/CD | 🔧 共通 | GitHub Actions による自動テスト (Pester 680件 — 29 test files) |
+| ⚡ CI/CD | 🔧 共通 | GitHub Actions による自動テスト (Pester 800件) |
+| 🌐 Mission Control WebUI | ⭐ Claude 専用 | `http://localhost:3737/mission-control` — SSE リアルタイム / 固定ジョブ実行 / システム健全性パネル / Basic Auth 対応 🆕 |
 | 🧠 ClaudeOS カーネル | ⭐ Claude 専用 | 28体のエージェント + 4フック + 34コマンド |
 | 🔌 MCP ヘルスチェック | ⭐ Claude 専用 | `McpHealthCheck.psm1` で4サーバーの起動・接続・状態診断 |
 | 🤖 Agent Teams ランタイム | ⭐ Claude 専用 | `AgentTeams.psm1` でタスク分析→Team自動構成→能力マトリクス→可視化 |
