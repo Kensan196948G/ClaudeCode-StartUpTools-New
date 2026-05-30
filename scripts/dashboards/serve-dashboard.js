@@ -55,7 +55,26 @@ const ALLOWED_JOBS = {
     'Select-String -Path README.md,CLAUDE.md -Pattern "v\\d+\\.\\d+\\.\\d+" -AllMatches -EA SilentlyContinue | ForEach-Object { "$($_.Filename): $($_.Matches.Value -join \",\")" } | Select-Object -Unique'], timeout: 15 },
 };
 const jobRunning = {};  // { [jobId]: true } while job is active
-const jobHistory = [];  // ring buffer – last 20 runs
+const JOB_HISTORY_FILE = path.join(os.homedir(), '.claudeos', 'job-history.json');
+const JOB_HISTORY_MAX  = 50;
+
+function loadJobHistory() {
+  try {
+    return JSON.parse(fs.readFileSync(JOB_HISTORY_FILE, 'utf8'));
+  } catch { return []; }
+}
+
+function saveJobHistory(history) {
+  try {
+    const dir = path.dirname(JOB_HISTORY_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const tmp = JOB_HISTORY_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(history, null, 2), 'utf8');
+    fs.renameSync(tmp, JOB_HISTORY_FILE);  // atomic replace
+  } catch { /* non-fatal: in-memory ring buffer still works */ }
+}
+
+const jobHistory = loadJobHistory();  // persisted ring buffer – last 50 runs
 
 // ── SSE (Server-Sent Events) ─────────────────────────────────────────────
 const sseClients = new Set();  // connected browser tabs
@@ -1093,6 +1112,8 @@ function handleJobRun(req, res) {
       entry.endAt = new Date().toISOString();
       entry.output = out.slice(-500);
       jobRunning[jobId] = false;
+      while (jobHistory.length > JOB_HISTORY_MAX) jobHistory.shift();
+      saveJobHistory(jobHistory);
       pushEvent('job-update', { jobId, status: 'timeout', startAt, endAt: entry.endAt });
     }, job.timeout * 1000);
 
@@ -1103,6 +1124,8 @@ function handleJobRun(req, res) {
       entry.endAt = new Date().toISOString();
       entry.output = out.slice(-500);
       jobRunning[jobId] = false;
+      while (jobHistory.length > JOB_HISTORY_MAX) jobHistory.shift();
+      saveJobHistory(jobHistory);
       pushEvent('job-update', { jobId, status: entry.status, exitCode: code, startAt, endAt: entry.endAt });
     });
 
@@ -1151,7 +1174,7 @@ function handleSystemHealth(res) {
   c.corsEnabled  = true;
   c.authEnabled  = !!AUTH_PASS;  // true when DASHBOARD_PASSWORD env or config.json.dashboardAuth set
   // Job history persistence
-  c.jobHistoryPersisted = false;
+  c.jobHistoryPersisted = fs.existsSync(JOB_HISTORY_FILE);
   // Untracked files
   try {
     const out = execSync('git ls-files --others --exclude-standard', { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 5000 });
