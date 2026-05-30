@@ -42,6 +42,17 @@ const ALLOWED_JOBS = {
   'psscriptanalyzer-run': { cmd: 'pwsh', args: ['-NonInteractive', '-Command',
     'Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error,Warning | Select-Object ScriptName,Line,Severity,RuleName,Message | Format-Table -AutoSize | Out-String -Width 200'],
     timeout: 60 },
+  // ── 管理系ジョブ（二段階確認付き）────────────────────────────────────────
+  'dashboard-task-register':   { cmd: 'pwsh', args: ['-NonInteractive', '-File', 'scripts/main/Register-DashboardTask.ps1', '-RunNow', '-NonInteractive'], timeout: 30,
+    requireConfirm: true, confirmMsg: 'Dashboard をタスクスケジューラーに登録し、今すぐ起動します。OS 設定（ログオン時自動起動）を変更します。' },
+  'dashboard-task-unregister': { cmd: 'pwsh', args: ['-NonInteractive', '-File', 'scripts/main/Register-DashboardTask.ps1', '-Unregister', '-NonInteractive'], timeout: 30,
+    requireConfirm: true, confirmMsg: 'Dashboard の自動起動タスクをスケジューラーから解除します。次回ログイン以降、自動起動しなくなります。' },
+  // ── 状態確認ジョブ（read-only）────────────────────────────────────────────
+  'dashboard-task-status':   { cmd: 'pwsh', args: ['-NonInteractive', '-File', 'scripts/main/Register-DashboardTask.ps1', '-Status', '-NonInteractive'], timeout: 10 },
+  'source-of-truth-drift':   { cmd: 'pwsh', args: ['-NonInteractive', '-Command',
+    '$t=(Get-ChildItem "Claude/templates/claudeos" -Recurse -File -EA SilentlyContinue).Count; $d=(Get-ChildItem ".claude/claudeos" -Recurse -File -EA SilentlyContinue).Count; Write-Host "Template: $t | Deployed: $d | Diff: $([Math]::Abs($t-$d))"'], timeout: 15 },
+  'version-drift-check':     { cmd: 'pwsh', args: ['-NonInteractive', '-Command',
+    'Select-String -Path README.md,CLAUDE.md -Pattern "v\\d+\\.\\d+\\.\\d+" -AllMatches -EA SilentlyContinue | ForEach-Object { "$($_.Filename): $($_.Matches.Value -join \",\")" } | Select-Object -Unique'], timeout: 15 },
 };
 const jobRunning = {};  // { [jobId]: true } while job is active
 const jobHistory = [];  // ring buffer – last 20 runs
@@ -1069,13 +1080,80 @@ function handleJobRun(req, res) {
 }
 
 function handleJobStatus(res) {
+  const jobsMeta = Object.fromEntries(
+    Object.entries(ALLOWED_JOBS).map(([k, v]) => [k, {
+      requireConfirm: !!v.requireConfirm,
+      confirmMsg:     v.confirmMsg || '',
+    }])
+  );
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
   res.end(JSON.stringify({
     running:   jobRunning,
     history:   jobHistory.slice(-20),
     jobs:      Object.keys(ALLOWED_JOBS),
+    jobsMeta,
     generated: new Date().toISOString(),
   }, null, 2));
+}
+
+// ── System Health ─────────────────────────────────────────────────────────
+function countFiles(dir) {
+  let n = 0;
+  function walk(d) {
+    if (!fs.existsSync(d)) return;
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      e.isDirectory() ? walk(path.join(d, e.name)) : n++;
+    }
+  }
+  try { walk(dir); } catch {}
+  return n;
+}
+
+function handleSystemHealth(res) {
+  const c = {};
+  // package.json
+  c.packageJsonMissing  = !fs.existsSync(path.join(PROJ_ROOT, 'package.json'));
+  // .claude/skills/
+  c.claudeSkillsMissing = !fs.existsSync(path.join(PROJ_ROOT, '.claude', 'skills'));
+  // CORS / Auth
+  c.corsEnabled  = true;
+  c.authEnabled  = false;
+  // Job history persistence
+  c.jobHistoryPersisted = false;
+  // Untracked files
+  try {
+    const out = execSync('git ls-files --others --exclude-standard', { cwd: PROJ_ROOT, encoding: 'utf8', timeout: 5000 });
+    const lines = out.trim().split('\n').filter(Boolean);
+    c.untrackedFilesCount    = lines.length;
+    c.reportsUntrackedCount  = lines.filter(l => l.startsWith('reports/')).length;
+  } catch { c.untrackedFilesCount = -1; c.reportsUntrackedCount = -1; }
+  // Source of Truth drift
+  try {
+    const tpl  = countFiles(path.join(PROJ_ROOT, 'Claude', 'templates', 'claudeos'));
+    const dep  = countFiles(path.join(PROJ_ROOT, '.claude', 'claudeos'));
+    c.templateFilesCount  = tpl;
+    c.deployedFilesCount  = dep;
+    c.sourceOfTruthDiff   = Math.abs(tpl - dep);
+  } catch { c.sourceOfTruthDiff = -1; }
+  // Dashboard Task status (Windows only)
+  try {
+    const out = execSync(
+      'powershell -NonInteractive -Command "(Get-ScheduledTask -TaskName \'ClaudeOS Dashboard\' -ErrorAction SilentlyContinue).State"',
+      { encoding: 'utf8', timeout: 5000 }
+    );
+    c.dashboardTaskState = out.trim() || 'NotRegistered';
+  } catch { c.dashboardTaskState = 'Unknown'; }
+  // state.json phase/deploy-ready
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(PROJ_ROOT, 'state.json'), 'utf8'));
+    c.currentPhase    = s.execution?.phase || s.phase || '—';
+    c.deployReady     = s.deploy?.ready || false;
+    c.maintenanceMode = (s.project?.phase_mode === 'maintenance');
+    c.stableAchieved  = s.stable?.stable_achieved || false;
+  } catch { c.currentPhase = '—'; }
+
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+  res.end(JSON.stringify({ checks: c, generated: new Date().toISOString() }, null, 2));
 }
 
 function handleSSE(req, res) {
@@ -1182,6 +1260,7 @@ if (require.main === module) {
     if (req.method === 'POST' && req.url === '/api/jobs') { return handleJobRun(req, res); }
     if (req.url === '/api/jobs/status')                    { return handleJobStatus(res); }
     if (req.url === '/api/events')                         { return handleSSE(req, res); }
+    if (req.url === '/api/system-health')                  { return handleSystemHealth(res); }
     if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());

@@ -475,6 +475,7 @@ const NAV_ITEMS = [
   { id:"dashboard", icon:"📊", label:"ダッシュボード" },
   { id:"agents",    icon:"🤖", label:"Agent Teams" },
   { id:"jobs",      icon:"⚙️", label:"Jobs" },
+  { id:"health",    icon:"🔎", label:"健全性" },
   { id:"cicd",      icon:"⚡", label:"CI / GitHub" },
   { id:"cron",      icon:"🕐", label:"Cron管理" },
   { id:"boot",      icon:"🚀", label:"Boot Sequence" },
@@ -1057,18 +1058,26 @@ const JOB_META = {
   'agent-teams-status':   { label: 'Agent Teams Status',   icon: '🤖', desc: 'Agent Teams 状態確認' },
   'gitleaks-run':         { label: 'Gitleaks Scan',        icon: '🔐', desc: 'シークレット検出' },
   // ── 診断系ジョブ ────────────────────────────────────────────────────────
-  'mcp-health':           { label: 'MCP Health Check',     icon: '🩹', desc: 'MCP サーバー疎通確認' },
-  'architecture-check':   { label: 'Architecture Check',   icon: '🏛️', desc: '設計規約違反検出' },
-  'worktree-list':        { label: 'Worktree List',        icon: '🌿', desc: 'Worktree 一覧確認' },
-  'test-all-tools':       { label: 'Test All Tools',       icon: '🩺', desc: '全ツール動作確認' },
-  'pester-run':           { label: 'Pester Tests',         icon: '🧪', desc: 'PowerShell テスト実行' },
-  'psscriptanalyzer-run': { label: 'PSScriptAnalyzer',     icon: '🔍', desc: 'PS スクリプト静的解析' },
+  'mcp-health':               { label: 'MCP Health Check',         icon: '🩹', desc: 'MCP サーバー疎通確認' },
+  'architecture-check':       { label: 'Architecture Check',       icon: '🏛️', desc: '設計規約違反検出' },
+  'worktree-list':            { label: 'Worktree List',            icon: '🌿', desc: 'Worktree 一覧確認' },
+  'test-all-tools':           { label: 'Test All Tools',           icon: '🩺', desc: '全ツール動作確認' },
+  'pester-run':               { label: 'Pester Tests',             icon: '🧪', desc: 'PowerShell テスト実行' },
+  'psscriptanalyzer-run':     { label: 'PSScriptAnalyzer',         icon: '🔍', desc: 'PS スクリプト静的解析' },
+  // ── 管理系ジョブ（二段階確認付き）────────────────────────────────────────
+  'dashboard-task-register':  { label: 'Task Register',            icon: '📌', desc: 'タスクスケジューラー登録', danger: true },
+  'dashboard-task-unregister':{ label: 'Task Unregister',          icon: '🗑️', desc: 'タスクスケジューラー解除', danger: true },
+  // ── 状態確認ジョブ ────────────────────────────────────────────────────────
+  'dashboard-task-status':    { label: 'Task Status',              icon: '📋', desc: 'スケジューラー状態確認' },
+  'source-of-truth-drift':    { label: 'SOT Drift Check',          icon: '🔄', desc: 'テンプレ vs 配備先 差分' },
+  'version-drift-check':      { label: 'Version Drift Check',      icon: '📝', desc: 'README/CLAUDE バージョン確認' },
 };
 
 function JobsPanel() {
-  const [status, setStatus] = React.useState({ running: {}, history: [], jobs: [] });
-  const [error, setError]   = React.useState(null);
-  const [busy, setBusy]     = React.useState({});
+  const [status,     setStatus]     = React.useState({ running: {}, history: [], jobs: [], jobsMeta: {} });
+  const [error,      setError]      = React.useState(null);
+  const [busy,       setBusy]       = React.useState({});
+  const [confirmJob, setConfirmJob] = React.useState(null);  // 二段階確認中のジョブID
 
   const fetchStatus = React.useCallback(() => {
     fetch('/api/jobs/status')
@@ -1100,7 +1109,14 @@ function JobsPanel() {
       .finally(() => setBusy(b => ({ ...b, [jobId]: false })));
   };
 
-  const jobs = status.jobs.length > 0 ? status.jobs : Object.keys(JOB_META);
+  const handleRunClick = (jobId) => {
+    if (status.running[jobId] || busy[jobId]) return;
+    const meta = status.jobsMeta?.[jobId];
+    if (meta?.requireConfirm) { setConfirmJob(jobId); } else { runJob(jobId); }
+  };
+
+  const jobs     = status.jobs.length > 0 ? status.jobs : Object.keys(JOB_META);
+  const jobsMeta = status.jobsMeta || {};
 
   const cardStyle = {
     border: `1px solid ${MC.border}`,
@@ -1112,14 +1128,14 @@ function JobsPanel() {
     gap: 8,
   };
 
-  const btnStyle = (isActive) => ({
+  const btnStyle = (isActive, isDanger) => ({
     padding: '6px 14px',
     fontSize: 12,
     borderRadius: 4,
     border: 'none',
     cursor: isActive ? 'not-allowed' : 'pointer',
-    background: isActive ? MC.textMuted : MC.accent,
-    color: '#fff',
+    background: isActive ? MC.textMuted : isDanger ? MC.amber : MC.accent,
+    color: isDanger && !isActive ? '#000' : '#fff',
     opacity: isActive ? 0.6 : 1,
     fontFamily: MC.mono,
     transition: 'opacity 0.15s',
@@ -1127,9 +1143,17 @@ function JobsPanel() {
 
   return (
     <div style={{ padding: 16 }}>
+      {/* 二段階確認モーダル */}
+      <ConfirmModal
+        jobId={confirmJob}
+        meta={jobsMeta[confirmJob]}
+        onConfirm={() => { runJob(confirmJob); setConfirmJob(null); }}
+        onCancel={() => setConfirmJob(null)}
+      />
+
       <h2 style={{ marginBottom: 16, fontSize: 15, fontWeight: 600, color: MC.text }}>⚙️ Fixed Jobs</h2>
       <p style={{ marginBottom: 16, fontSize: 12, color: MC.textDim }}>
-        CLIスクリプトを許可リスト方式で実行します。任意コマンドの注入はできません。
+        CLIスクリプトを許可リスト方式で実行します。⚠️ マークは二段階確認が必要です。
       </p>
 
       {/* ── Job cards ── */}
@@ -1137,6 +1161,7 @@ function JobsPanel() {
         {jobs.map(jobId => {
           const meta      = JOB_META[jobId] || { label: jobId, icon: '⚙️', desc: '' };
           const isRunning = status.running[jobId] || busy[jobId];
+          const isDanger  = meta.danger || jobsMeta[jobId]?.requireConfirm;
           const lastRun   = [...status.history].reverse().find(h => h.jobId === jobId);
           const dot       = isRunning ? '⏳'
                           : lastRun?.status === 'done'    ? '✅'
@@ -1144,9 +1169,10 @@ function JobsPanel() {
                           : lastRun?.status === 'timeout' ? '⏰'
                           : '⚪';
           return (
-            <div key={jobId} style={cardStyle}>
+            <div key={jobId} style={{ ...cardStyle, borderColor: isDanger ? `${MC.amber}66` : MC.border }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: MC.text }}>
                 {meta.icon} {meta.label}
+                {isDanger && <span style={{ marginLeft:6, fontSize:10, color:MC.amber }}>⚠️ 確認要</span>}
               </div>
               <div style={{ fontSize: 11, color: MC.textMuted }}>{meta.desc}</div>
               {lastRun && (
@@ -1158,8 +1184,8 @@ function JobsPanel() {
                   {lastRun.endAt && <span style={{ marginLeft: 4 }}>{lastRun.endAt.slice(11, 19)}</span>}
                 </div>
               )}
-              <button style={btnStyle(isRunning)} onClick={() => runJob(jobId)} disabled={isRunning}>
-                {isRunning ? '⏳ Running…' : '▶ Run'}
+              <button style={btnStyle(isRunning, isDanger)} onClick={() => handleRunClick(jobId)} disabled={isRunning}>
+                {isRunning ? '⏳ Running…' : isDanger ? '⚠️ Run' : '▶ Run'}
               </button>
             </div>
           );
@@ -1205,6 +1231,155 @@ function JobsPanel() {
   );
 }
 window.JobsPanel = JobsPanel;
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       BLOCK 5.6: ConfirmModal + SystemHealthPanel
+  ═══════════════════════════════════════════════════ -->
+  <script type="text/babel">
+
+// ── ConfirmModal（二段階確認ダイアログ）──────────────────────────────────
+function ConfirmModal({ jobId, meta, onConfirm, onCancel }) {
+  if (!jobId) return null;
+  return (
+    <div style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:9000,
+      display:'flex', alignItems:'center', justifyContent:'center',
+    }} onClick={onCancel}>
+      <div style={{
+        background: MC.bgPanel, border:`1px solid ${MC.amber}`, borderRadius:10,
+        padding:28, maxWidth:440, width:'90%', boxShadow:'0 8px 32px rgba(0,0,0,0.5)',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize:20, marginBottom:12 }}>⚠️ 実行確認</div>
+        <div style={{ fontSize:13, fontWeight:600, color: MC.amber, marginBottom:10, fontFamily:MC.mono }}>
+          {jobId}
+        </div>
+        <div style={{ fontSize:12, color: MC.text, lineHeight:1.7, marginBottom:20, background: MC.bgCard, padding:'10px 14px', borderRadius:6 }}>
+          {meta?.confirmMsg || 'この操作を実行しますか？'}
+        </div>
+        <div style={{ display:'flex', gap:10, justifyContent:'flex-end' }}>
+          <button onClick={onCancel} style={{
+            padding:'8px 20px', borderRadius:5, border:`1px solid ${MC.border}`,
+            background:'transparent', color:MC.textMuted, fontSize:12, cursor:'pointer',
+          }}>キャンセル</button>
+          <button onClick={onConfirm} style={{
+            padding:'8px 20px', borderRadius:5, border:'none',
+            background: MC.amber, color:'#000', fontSize:12, fontWeight:700, cursor:'pointer',
+          }}>確認して実行</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+window.ConfirmModal = ConfirmModal;
+
+// ── SystemHealthPanel（システム健全性）───────────────────────────────────
+const HEALTH_ITEMS = [
+  { key:'packageJsonMissing',   label:'package.json',          warn: v => v,     icon:'📦', warnMsg:'未存在（package-lock.json のみ）', okMsg:'存在' },
+  { key:'claudeSkillsMissing',  label:'.claude/skills/',       warn: v => v,     icon:'🎯', warnMsg:'未存在（公式 2.1.157 未追随）', okMsg:'存在' },
+  { key:'authEnabled',          label:'認証 (Auth)',           warn: v => !v,    icon:'🔐', warnMsg:'未実装（LAN公開中）', okMsg:'有効' },
+  { key:'corsEnabled',          label:'CORS',                  warn: v => v,     icon:'🌐', warnMsg:'全許可（* 設定）', okMsg:'無効' },
+  { key:'jobHistoryPersisted',  label:'ジョブ履歴永続化',       warn: v => !v,    icon:'💾', warnMsg:'メモリのみ（再起動で消失）', okMsg:'ファイル永続化済み' },
+  { key:'untrackedFilesCount',  label:'未追跡ファイル',         warn: v => v > 0, icon:'📁', warnMsg: v => `${v} 件`, okMsg:'0 件' },
+  { key:'reportsUntrackedCount',label:'reports/ 未追跡',        warn: v => v > 0, icon:'📊', warnMsg: v => `${v} 件（コミットリスク）`, okMsg:'0 件' },
+  { key:'sourceOfTruthDiff',    label:'SOT ドリフト',           warn: v => v > 0, icon:'🔄', warnMsg: v => `差分 ${v} ファイル`, okMsg:'差分なし' },
+  { key:'dashboardTaskState',   label:'Task Scheduler',        warn: v => v !== 'Ready', icon:'⚙️', warnMsg: v => v, okMsg:'Ready' },
+  { key:'currentPhase',         label:'現在フェーズ',           warn: () => false, icon:'🔁', warnMsg: v => v, okMsg: v => v },
+  { key:'stableAchieved',       label:'STABLE',                warn: v => !v,    icon:'✅', warnMsg:'未達成', okMsg:'達成済み' },
+  { key:'deployReady',          label:'Deploy Ready',          warn: () => false, icon:'🚀', warnMsg:'未設定', okMsg:'準備完了 🚀' },
+];
+
+function SystemHealthPanel() {
+  const [health, setHealth] = React.useState(null);
+  const [error,  setError]  = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const refresh = React.useCallback(() => {
+    setLoading(true);
+    fetch('/api/system-health')
+      .then(r => r.json())
+      .then(d => { setHealth(d); setError(null); })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  React.useEffect(() => {
+    refresh();
+    const tid = setInterval(refresh, 30000);
+    return () => clearInterval(tid);
+  }, [refresh]);
+
+  const c = health?.checks || {};
+
+  return (
+    <div style={{ padding:16 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+        <h2 style={{ fontSize:15, fontWeight:600, color:MC.text, margin:0 }}>🔎 システム健全性</h2>
+        <button onClick={refresh} style={{ padding:'4px 12px', borderRadius:4, border:`1px solid ${MC.border}`,
+          background:'transparent', color:MC.textDim, fontSize:11, cursor:'pointer' }}>
+          {loading ? '⏳ 取得中…' : '↻ 更新'}
+        </button>
+        {health?.generated && (
+          <span style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>
+            {health.generated.slice(11,19)} 取得
+          </span>
+        )}
+      </div>
+
+      {error && <div style={{ color:'#f66', marginBottom:12, fontSize:12 }}>❌ {error}</div>}
+
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:10, marginBottom:24 }}>
+        {HEALTH_ITEMS.map(item => {
+          const val     = c[item.key];
+          const isWarn  = typeof item.warn === 'function' ? item.warn(val) : false;
+          const color   = val === undefined ? MC.textMuted : isWarn ? MC.amber : MC.green;
+          const msgRaw  = val === undefined ? '取得中…'
+            : isWarn
+              ? (typeof item.warnMsg === 'function' ? item.warnMsg(val) : item.warnMsg)
+              : (typeof item.okMsg   === 'function' ? item.okMsg(val)   : item.okMsg);
+          return (
+            <div key={item.key} style={{
+              border:`1px solid ${color}44`, borderRadius:6, padding:'10px 14px',
+              background: MC.bgPanel, display:'flex', alignItems:'center', gap:10,
+            }}>
+              <span style={{ fontSize:18, flexShrink:0 }}>{item.icon}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:11, color:MC.textDim, marginBottom:2 }}>{item.label}</div>
+                <div style={{ fontSize:12, color, fontWeight:600, fontFamily:MC.mono, wordBreak:'break-all' }}>
+                  {isWarn ? '⚠️ ' : (val !== undefined && !isWarn ? '✅ ' : '')}{msgRaw}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 追加項目（評価 §3 対応）*/}
+      <details style={{ marginBottom:16 }}>
+        <summary style={{ cursor:'pointer', fontSize:12, color:MC.textDim, padding:'6px 0' }}>
+          📋 未実装・将来対応予定の項目
+        </summary>
+        <div style={{ marginTop:8, padding:12, background:MC.bgPanel, borderRadius:6, fontSize:11, color:MC.textMuted, lineHeight:2 }}>
+          {[
+            '🔄 Cron dry-run 結果と実 crontab の差分（Phase 3）',
+            '🔐 WebUI 権限プロファイル（Phase 5）',
+            '💾 ジョブ実行履歴のファイル永続化',
+            '📦 package.json 生成（Node 依存管理の正規化）',
+            '🎯 .claude/skills/ 公式配置（Claude Code 2.1.157 対応）',
+            '🕵️ secret hygiene status（gitleaks 定期スキャン結果統合）',
+            '📅 最新 Claude Code changelog 対応状況マトリクス',
+            '🔑 Basic Auth または IP 許可リスト導入',
+          ].map((s,i) => <div key={i}>{s}</div>)}
+        </div>
+      </details>
+
+      <div style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono }}>
+        ※ 30秒ごと自動更新 — 赤はエラー / ⚠️ は要確認 / ✅ は正常
+      </div>
+    </div>
+  );
+}
+window.SystemHealthPanel = SystemHealthPanel;
   </script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -2061,6 +2236,7 @@ const App = () => {
       case "dashboard": return <DashboardPanel state={state} sessionElapsed={sessionElapsed} liveData={liveData} />;
       case "agents":    return <AgentsPanel state={state} liveData={liveData} agentTeamsActivity={agentTeamsActivity} />;
       case "jobs":      return <JobsPanel />;
+      case "health":    return <SystemHealthPanel />;
       case "cicd":      return <CICDPanel liveData={liveData} />;
       case "cron":      return <CronPanel liveData={liveData} />;
       case "boot":      return <BootPanel state={state} liveData={liveData} />;
