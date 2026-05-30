@@ -22,6 +22,8 @@
     tmux セッション検出のポーリング間隔（秒）。既定: 5。
 #>
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'WithSessionInfoTab', Justification = 'Backward-compatibility parameter; intentionally retained for callers that pass this flag')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'TmuxAttach',         Justification = 'Backward-compatibility parameter; intentionally retained for callers that pass this flag')]
 param(
     [switch]$NewTab,
     [switch]$WithSessionInfoTab,   # 後方互換
@@ -177,6 +179,7 @@ done | sort -t'|' -k2 -rn | head -1 | cut -d'|' -f1
 
 # cron-launcher.sh をバックグラウンドで即実行し、起動したセッション名を返す
 function Start-CronSession {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Background session launcher; ShouldProcess would require interactive prompts incompatible with automated cron execution')]
     param([string]$Project, [int]$DurationMin = 300)
     $safeName  = $Project -replace '[^A-Za-z0-9_-]', '_'
     $logFile   = "$LogsDir/cron-`$(date +%Y%m%d-%H%M%S).log"

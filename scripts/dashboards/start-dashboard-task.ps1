@@ -14,23 +14,25 @@ $Port        = 3737
 $logDir = Split-Path -Parent $LogFile
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
 
-function Write-Log {
+function Write-DashboardLog {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '',
+        Justification = 'Write-DashboardLog is a local file logging helper; PowerShell 6.1 compatibility module name clash is harmless in this context')]
     param([string]$Msg)
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $Msg"
     Add-Content -Path $LogFile -Value $line -Encoding UTF8
 }
 
-Write-Log "=== Dashboard task start ==="
+Write-DashboardLog "=== Dashboard task start ==="
 
 # config.json から projectsDir 取得
 if (Test-Path $ConfigPath) {
     try {
         $cfg = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($cfg.projectsDir) { $env:AI_STARTUP_PROJECTS_DIR = $cfg.projectsDir }
-    } catch { Write-Log "config.json read error: $_" }
+    } catch { Write-DashboardLog "config.json read error: $_" }
 }
 
-Write-Log "PROJECTS_DIR: $env:AI_STARTUP_PROJECTS_DIR"
+Write-DashboardLog "PROJECTS_DIR: $env:AI_STARTUP_PROJECTS_DIR"
 
 # 二重起動防止: ポートが既に使われていれば起動しない
 $portInUse = $false
@@ -43,18 +45,18 @@ try {
 }
 
 if ($portInUse) {
-    Write-Log "Port $Port already in use — dashboard already running. Skip."
+    Write-DashboardLog "Port $Port already in use — dashboard already running. Skip."
     exit 0
 }
 
 # node が見つからなければ終了
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) {
-    Write-Log "ERROR: node.exe not found"
+    Write-DashboardLog "ERROR: node.exe not found"
     exit 1
 }
 
-Write-Log "Starting: node $DashJs $Port (detached)"
+Write-DashboardLog "Starting: node $DashJs $Port (detached)"
 
 # node を独立プロセスとして起動（PowerShell ウィンドウと切り離す）
 # これにより PS ウィンドウが閉じても node は継続稼働する
@@ -69,12 +71,12 @@ try {
         -PassThru
 
     if ($proc) {
-        Write-Log "Started: PID=$($proc.Id)  URL=http://localhost:$Port"
+        Write-DashboardLog "Started: PID=$($proc.Id)  URL=http://localhost:$Port"
     } else {
-        Write-Log "ERROR: Start-Process returned null"
+        Write-DashboardLog "ERROR: Start-Process returned null"
     }
 } catch {
-    Write-Log "ERROR: $_"
+    Write-DashboardLog "ERROR: $_"
 }
 
-Write-Log "=== Dashboard task launcher end (node continues in background) ==="
+Write-DashboardLog "=== Dashboard task launcher end (node continues in background) ==="

@@ -186,7 +186,7 @@ function Add-ClaudeOSCronEntry {
     try {
         Add-LocalCronRegistryEntry -Id $id -Project $Project -LinuxHost $LinuxHost `
             -DayOfWeek $DayOfWeek -Time $Time -DurationMinutes $DurationMinutes
-    } catch { <# registry 更新失敗はサイレント無視 #> }
+    } catch { $null = $_ <# registry 更新失敗はサイレント無視 #> }
 
     return [pscustomobject]@{
         Id = $id
@@ -234,7 +234,7 @@ function Remove-ClaudeOSCronEntry {
     }
 
     # P1-3: Windows 側のローカルレジストリからも削除
-    try { Remove-LocalCronRegistryEntry -Id $Id } catch { <# サイレント無視 #> }
+    try { Remove-LocalCronRegistryEntry -Id $Id } catch { $null = $_ <# サイレント無視 #> }
 
     return $removed
 }

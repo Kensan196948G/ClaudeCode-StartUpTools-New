@@ -343,6 +343,7 @@ fi
 #>
 function Repair-RemoteProjectHooks {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Remote repair operation; ShouldProcess would require interactive prompts incompatible with automated runs')]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'Hooks is a compound noun referring to the hooks directory; singular form would be misleading')]
     param(
         [Parameter(Mandatory)]
         [string]$LinuxHost,

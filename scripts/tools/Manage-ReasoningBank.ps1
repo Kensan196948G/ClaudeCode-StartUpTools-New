@@ -21,6 +21,9 @@
     Simulate で表示するパターン数（既定: 3）
 #>
 
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'MinConfidence', Justification = 'Reserved for future confidence-filtered output; API surface must remain stable')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'OutputPath',    Justification = 'Reserved for future file-export feature; API surface must remain stable')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', 'TopN',          Justification = 'Reserved for future top-N ranking; API surface must remain stable')]
 param(
     [ValidateSet('List','Stats','Purge','Export','Simulate','')]
     [string]$Action = '',
@@ -101,6 +104,8 @@ function Invoke-List {
 # ------------------------------------------------------------------ Stats
 
 function Invoke-Stats {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSingularNouns', '', Justification = 'Stats is a commonly used compound abbreviation for statistics; renaming would reduce readability')]
+    param()
     $bank = Read-Bank; if (-not $bank) { return }
     $entries = @($bank.entries)
     Write-Host ""
