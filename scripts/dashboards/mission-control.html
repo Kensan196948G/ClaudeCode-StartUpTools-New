@@ -1073,6 +1073,61 @@ const JOB_META = {
   'version-drift-check':      { label: 'Version Drift Check',      icon: '📝', desc: 'README/CLAUDE バージョン確認' },
 };
 
+// ── HistoryTable — expandable output rows ──────────────────────────────────
+function HistoryTable({ history }) {
+  const [expanded, setExpanded] = React.useState(null);
+  const rows = [...history].reverse().slice(0, 15);
+  return (
+    <>
+      <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: MC.textDim }}>📋 Recent Runs <span style={{ fontSize:11, color: MC.textMuted }}>(クリックで出力展開)</span></h3>
+      <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', fontFamily: MC.mono }}>
+        <thead>
+          <tr style={{ borderBottom: `1px solid ${MC.border}` }}>
+            {['', 'Job', 'Status', 'Started', 'Ended', 'Exit'].map(h => (
+              <th key={h} style={{ textAlign: 'left', padding: '4px 8px', color: MC.textDim, fontWeight: 500 }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((h, i) => {
+            const m   = JOB_META[h.jobId] || { icon: '⚙️' };
+            const dot = h.status === 'done'    ? '✅'
+                      : h.status === 'failed'  ? '❌'
+                      : h.status === 'running' ? '⏳'
+                      : h.status === 'timeout' ? '⏰' : '⚪';
+            const isOpen = expanded === i;
+            return (
+              <React.Fragment key={i}>
+                <tr
+                  onClick={() => setExpanded(isOpen ? null : i)}
+                  style={{ borderBottom: `1px solid ${MC.bgPanel}`, cursor: h.output ? 'pointer' : 'default',
+                           background: isOpen ? MC.bgPanel : 'transparent' }}>
+                  <td style={{ padding: '4px 6px', color: MC.textDim, fontSize: 11 }}>{h.output ? (isOpen ? '▼' : '▶') : ' '}</td>
+                  <td style={{ padding: '4px 8px', color: MC.text }}>{m.icon} {h.jobId}</td>
+                  <td style={{ padding: '4px 8px' }}>{dot} {h.status}</td>
+                  <td style={{ padding: '4px 8px', color: MC.textMuted }}>{h.startAt?.slice(11, 19) || '—'}</td>
+                  <td style={{ padding: '4px 8px', color: MC.textMuted }}>{h.endAt?.slice(11, 19) || '…'}</td>
+                  <td style={{ padding: '4px 8px', color: h.exitCode ? '#f66' : MC.textMuted }}>{h.exitCode ?? '—'}</td>
+                </tr>
+                {isOpen && h.output && (
+                  <tr style={{ background: MC.bgPanel }}>
+                    <td colSpan={6} style={{ padding: '8px 12px' }}>
+                      <pre style={{ margin: 0, fontSize: 11, color: MC.textMuted, whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                                    maxHeight: 200, overflowY: 'auto', fontFamily: MC.mono }}>
+                        {h.output}
+                      </pre>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
+  );
+}
+
 function JobsPanel() {
   const [status,     setStatus]     = React.useState({ running: {}, history: [], jobs: [], jobsMeta: {} });
   const [error,      setError]      = React.useState(null);
@@ -1194,36 +1249,7 @@ function JobsPanel() {
 
       {/* ── History table ── */}
       {status.history.length > 0 && (
-        <>
-          <h3 style={{ marginBottom: 8, fontSize: 13, fontWeight: 600, color: MC.textDim }}>📋 Recent Runs</h3>
-          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', fontFamily: MC.mono }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${MC.border}` }}>
-                {['Job', 'Status', 'Started', 'Ended', 'Exit'].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '4px 10px', color: MC.textDim, fontWeight: 500 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[...status.history].reverse().slice(0, 10).map((h, i) => {
-                const m   = JOB_META[h.jobId] || { icon: '⚙️' };
-                const dot = h.status === 'done'    ? '✅'
-                          : h.status === 'failed'  ? '❌'
-                          : h.status === 'running' ? '⏳'
-                          : h.status === 'timeout' ? '⏰' : '⚪';
-                return (
-                  <tr key={i} style={{ borderBottom: `1px solid ${MC.bgPanel}` }}>
-                    <td style={{ padding: '4px 10px', color: MC.text }}>{m.icon} {h.jobId}</td>
-                    <td style={{ padding: '4px 10px' }}>{dot} {h.status}</td>
-                    <td style={{ padding: '4px 10px', color: MC.textMuted }}>{h.startAt?.slice(11, 19) || '—'}</td>
-                    <td style={{ padding: '4px 10px', color: MC.textMuted }}>{h.endAt?.slice(11, 19) || '…'}</td>
-                    <td style={{ padding: '4px 10px', color: h.exitCode ? '#f66' : MC.textMuted }}>{h.exitCode ?? '—'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </>
+        <HistoryTable history={status.history} />
       )}
 
       {error && <div style={{ color: '#f66', marginTop: 10, fontSize: 12 }}>❌ {error}</div>}
