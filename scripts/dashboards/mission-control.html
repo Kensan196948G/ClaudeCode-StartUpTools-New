@@ -182,7 +182,7 @@ Object.assign(window, { useTweaks, TweaksPanel, TweakSection, TweakToggle, Tweak
   <script type="text/babel">
 const MOCK_STATE = {
   goal: { title: "ClaudeOS v9.0 自律開発最適化 — 全テスト PASS・CI安定・STABLE達成" },
-  project: { name: "ClaudeCode-StartUpTools-New", registration_date: "2026-01-15", release_deadline: null, phase_mode: "development", cron_enabled: true, session_max_minutes: 300, version: "v3.2.107" },
+  project: { name: "ClaudeCode-StartUpTools-New", registration_date: "2026-01-15", release_deadline: null, phase_mode: "development", cron_enabled: true, session_max_minutes: 300, version: "v3.3.2" },
   kpi: { success_rate_target: 0.9, ci_success_rate: 0.96, test_pass_rate: 1.0, security_critical: 0, blocker_count: 0 },
   execution: { start_time: new Date(Date.now() - 142*60000).toISOString(), max_duration_minutes: 300, elapsed_minutes: 142, remaining_minutes: 158, phase: "Development", last_stop_at: new Date(Date.now() - 86400000).toISOString(), current_session_prs: ["#241","#242"], current_session_last_pr: "#242" },
   stable: { consecutive_success: 2, target_n: 3, last_verified_at: new Date(Date.now() - 3600000).toISOString(), stable_achieved: false },
@@ -197,8 +197,8 @@ const MOCK_STATE = {
 const AGENTS_DATA = [
   { id: "cto", icon: "👔", name: "CTO", nameJa: "最高技術責任者", status: "working", domain: "Orchestration", lastAction: "Agent Teams パターンA 起動判断", time: "2m前" },
   { id: "architect", icon: "🏛️", name: "Architect", nameJa: "アーキテクト", status: "working", domain: "Design", lastAction: "モジュール分割設計レビュー", time: "5m前" },
-  { id: "developer", icon: "💻", name: "Developer", nameJa: "デベロッパー", status: "working", domain: "Development", lastAction: "v3.2.107 WebUI検証項目追加", time: "1m前" },
-  { id: "qa", icon: "🧪", name: "QA", nameJa: "品質保証", status: "idle", domain: "Testing", lastAction: "776件テスト全PASS確認", time: "15m前" },
+  { id: "developer", icon: "💻", name: "Developer", nameJa: "デベロッパー", status: "working", domain: "Development", lastAction: "v3.3.2 Basic Auth + package.json 整備", time: "1m前" },
+  { id: "qa", icon: "🧪", name: "QA", nameJa: "品質保証", status: "idle", domain: "Testing", lastAction: "800件テスト全PASS確認", time: "15m前" },
   { id: "reviewer", icon: "🔍", name: "Reviewer", nameJa: "レビュアー", status: "completed", domain: "Quality", lastAction: "PR #242 差分レビュー完了", time: "8m前" },
   { id: "security", icon: "🔒", name: "Security", nameJa: "セキュリティ", status: "idle", domain: "Quality", lastAction: "secret漏洩スキャン OK", time: "20m前" },
   { id: "devops", icon: "⚙️", name: "DevOps", nameJa: "運用基盤", status: "working", domain: "Operations", lastAction: "CI パイプライン監視中", time: "3m前" },
@@ -211,7 +211,7 @@ const AGENTS_DATA = [
   { id: "audit", icon: "📋", name: "Audit-Agent", nameJa: "監査", status: "idle", domain: "Infrastructure", lastAction: "変更証跡確認完了", time: "35m前" },
   { id: "sec-reviewer", icon: "🛡️", name: "security-reviewer", nameJa: "セキュリティレビュアー", status: "completed", domain: "Quality", lastAction: "XSS/CSRF/IDOR チェック完了", time: "10m前" },
   { id: "e2e-runner", icon: "🎭", name: "e2e-runner", nameJa: "E2Eテスト実行", status: "idle", domain: "Testing", lastAction: "E2Eコアテスト PASS", time: "18m前" },
-  { id: "tester", icon: "✅", name: "tester", nameJa: "テスター", status: "idle", domain: "Testing", lastAction: "776件全PASS", time: "15m前" },
+  { id: "tester", icon: "✅", name: "tester", nameJa: "テスター", status: "idle", domain: "Testing", lastAction: "800件全PASS", time: "15m前" },
 ];
 
 const CI_WORKFLOWS = [
@@ -505,8 +505,8 @@ function SideNav({ active, onChange }) {
       })}
       <div style={{ marginTop:"auto", padding:16, borderTop:`1px solid ${MC.border}` }}>
         <div style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono, lineHeight:1.6 }}>
-          <div>v3.2.107</div>
-          <div>テスト: 776件</div>
+          <div>v3.3.2</div>
+          <div>テスト: 800件</div>
           <div>エージェント: 28体</div>
           <div>フック: 4個</div>
         </div>
@@ -1473,7 +1473,7 @@ const CICDPanel = ({ liveData }) => {
         <Panel title="CI サマリー" icon="📊">
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             <div style={{ display:"flex", justifyContent:"center" }}><Gauge value={96} max={100} size={100} strokeWidth={8} color={MC.green} label="CI 成功率" /></div>
-            {[["テスト件数","776",MC.green],["PSScriptAnalyzer","0 警告",MC.green],["gitleaks","0 漏洩",MC.green],["Unit","21 files",MC.textDim],["Integration","11 files",MC.textDim]].map(([l,v,c]) => (
+            {[["テスト件数","800",MC.green],["PSScriptAnalyzer","11 警告",MC.amber],["gitleaks","0 漏洩",MC.green],["Unit","21 files",MC.textDim],["Integration","11 files",MC.textDim]].map(([l,v,c]) => (
               <div key={l} style={{ display:"flex", justifyContent:"space-between", fontSize:11 }}><span style={{ color:MC.textMuted }}>{l}</span><span style={{ fontFamily:MC.mono, color:c, fontWeight:500 }}>{v}</span></div>
             ))}
           </div>
