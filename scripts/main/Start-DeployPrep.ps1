@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # Start-DeployPrep.ps1 - CTO主導デプロイ準備スクリプト
 # state.json の deploy.ready=true を設定し、Runbook を生成する
 # 実際のデプロイ実行は人間（ユーザー）が手動で行う
@@ -131,7 +131,7 @@ try {
     $state.deploy.runbook_generated = $true
     $state.deploy.runbook_path = "reports/deploy-runbook-$timestamp.md"
     $state | ConvertTo-Json -Depth 20 | Set-Content $StateFile -Encoding UTF8
-} catch { }
+} catch { $null = $_ }
 
 Write-Host "  ✅ Runbook 生成完了: $runbookFile" -ForegroundColor Green
 Write-Host ""

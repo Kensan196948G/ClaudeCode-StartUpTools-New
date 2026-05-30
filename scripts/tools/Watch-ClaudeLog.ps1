@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     メニュー13: Claude セッション起動・監視タブ。
 .DESCRIPTION

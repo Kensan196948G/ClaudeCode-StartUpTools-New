@@ -255,7 +255,7 @@ try {
                     $projDurMonths = [int]$st.project.duration_months
                 }
             }
-        } catch { }
+        } catch { $null = $_ }
     }
 
     if ($Config.PSObject.Properties.Name -contains 'sessionTabs' -and $Config.sessionTabs.enabled) {

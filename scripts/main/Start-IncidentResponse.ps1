@@ -1,4 +1,4 @@
-# ============================================================
+﻿# ============================================================
 # Start-IncidentResponse.ps1 - インシデント対応スクリプト（保守フェーズ専用）
 # P1/P2/P3 トリアージを実施し、インシデント記録を作成する
 # ============================================================
@@ -104,7 +104,7 @@ try {
         $state.maintenance.last_incident_id = $incidentId
         $state | ConvertTo-Json -Depth 20 | Set-Content $StateFile -Encoding UTF8
     }
-} catch { }
+} catch { $null = $_ }
 
 Write-Host ""
 Write-Host "  ✅ インシデントレポート作成: $incidentFile" -ForegroundColor Green

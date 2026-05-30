@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     MCP server health check script.
 .DESCRIPTION

@@ -195,7 +195,7 @@ function Get-ProjectPhaseMode {
             $deployReady = if ($null -ne $state.deploy.ready) { $state.deploy.ready } else { $false }
             return [pscustomobject]@{ Mode = $mode; DeployReady = $deployReady }
         }
-    } catch { }
+    } catch { $null = $_ }
     return [pscustomobject]@{ Mode = "development"; DeployReady = $false }
 }
 

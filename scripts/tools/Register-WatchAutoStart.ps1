@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Watch-ClaudeLog.ps1 をWindowsログオン時に自動起動するタスクスケジューラタスクを登録する。
 .DESCRIPTION

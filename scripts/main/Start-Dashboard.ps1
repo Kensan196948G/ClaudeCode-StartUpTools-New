@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ClaudeOS Projects Dashboard を起動する。
 .DESCRIPTION
@@ -36,7 +36,7 @@ if (Test-Path $ConfigPath) {
     try {
         $cfg = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($cfg.projectsDir) { $env:AI_STARTUP_PROJECTS_DIR = $cfg.projectsDir }
-    } catch { }
+    } catch { $null = $_ }
 }
 
 $url = "http://localhost:$Port"
@@ -68,7 +68,7 @@ for ($i = 0; $i -lt 10; $i++) {
         $null = [System.Net.WebClient]::new().DownloadString($url)
         $started = $true
         break
-    } catch { }
+    } catch { $null = $_ }
 }
 
 if (-not $started) {

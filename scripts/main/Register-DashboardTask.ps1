@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ClaudeOS Dashboard をタスクスケジューラーに登録・解除する。
 .DESCRIPTION

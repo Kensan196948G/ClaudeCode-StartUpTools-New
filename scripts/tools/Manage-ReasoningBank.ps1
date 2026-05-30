@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     ReasoningBank 管理ツール — ClaudeOS v8.2 Stage-3
 .DESCRIPTION

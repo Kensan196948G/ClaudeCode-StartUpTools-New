@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Agent Teams runtime diagnostic and team composition tool.
 .DESCRIPTION
