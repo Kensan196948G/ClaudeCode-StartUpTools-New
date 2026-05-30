@@ -2,6 +2,35 @@
 
 # CHANGELOG
 
+## [v3.3.2] - 2026-05-30 — WebUI Basic Auth + package.json + .claude/skills/ + state.json 整備
+
+### 🎯 概要
+LAN 公開中の Mission Control WebUI にオプション型 HTTP Basic Auth を実装。`package.json` 正式作成・`.claude/skills/` ディレクトリ新設・`state.json` 大幅圧縮・`.gitignore` reports 除外追加・ジョブ履歴永続化を実施。
+
+### 🔧 変更対象
+
+| ファイル | 変更内容 |
+|---|---|
+| `scripts/dashboards/serve-dashboard.js` | HTTP Basic Auth ミドルウェア（`DASHBOARD_PASSWORD` env / `config.json.dashboardAuth`）/ ジョブ履歴を `~/.claudeos/job-history.json` にアトミック保存（50件リング）/ `authEnabled`・`jobHistoryPersisted` を動的判定に変更 |
+| `scripts/dashboards/mission-control.html` | health panel の auth/package/skills メッセージ改善 |
+| `package.json` | 新規作成（Node 18+, `npm start` で Dashboard 起動） |
+| `.claude/skills/cto-session-start.md` | CTO 全権委任セッション手順スキル（新規） |
+| `.claude/skills/webui-health-check.md` | WebUI 健全性確認スキル（新規） |
+| `.codex/hooks.json` | Codex PostToolUse hooks 設定（追跡開始） |
+| `.gitignore` | `reports/audit/` `reports/cmdb/` `reports/deploy-runbook-*.md` `reports/ultrareview/` 追加 |
+| `CHANGELOG.md` | v3.3.2 エントリ追加 |
+
+### ✅ 主な改善内容
+
+- **Basic Auth**: `DASHBOARD_PASSWORD` 環境変数または `config.json.dashboardAuth` で有効化可能。`/api/health` は常時公開（監視プローブ用）
+- **package.json**: `npm start` → Dashboard 起動、`npm test` → Pester テスト実行
+- **`.claude/skills/`**: Claude Code 2.1.157 準拠ディレクトリを新設（2スキル）
+- **state.json 圧縮**: 重複 `tdd_required` warnings 150+ エントリを 5 エントリに整理（2009行 → 355行）
+- **ジョブ履歴**: インメモリ → ファイル永続化（再起動後も履歴を保持）
+- **README 更新**: Basic Auth セットアップ手順・config.json 設定例を追加
+
+---
+
 ## [v3.3.1] - 2026-05-13 — Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新
 
 ### 🎯 概要
