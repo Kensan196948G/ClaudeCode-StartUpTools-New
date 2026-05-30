@@ -2,6 +2,32 @@
 
 # CHANGELOG
 
+## [v3.3.5] - 2026-05-30 — サーバー自動再起動 + SSE Token 認証 + Gate-1 検証 + SOT 同期
+
+### 🎯 概要
+開発生産性改善（watch-and-run.js）、SSE 認証強化（URL token）、WebUI Gate-1 全項目検証、SOT ドリフト解消（93ファイルデプロイ）。
+
+### 🔧 変更対象
+
+| ファイル | 変更内容 |
+|---|---|
+| `scripts/dashboards/watch-and-run.js` | サーバー自動再起動 Supervisor（新規）— fs.watchFile + 子プロセス管理 |
+| `scripts/dashboards/serve-dashboard.js` | SSE Token 認証（/api/token + sseTokens Map）/ /api/system-health 15秒キャッシュ + timeout 1.5s / snapshots SKIP_DIRS追加 |
+| `scripts/dashboards/mission-control.html` | SSE: fetch('/api/token') → connectSSE(token) フロー / cron-change イベント |
+| `scripts/dashboards/pm2.config.js` | watch enabled（js ファイル変更時のみ） |
+| `package.json` | start:watch スクリプト追加 |
+| `.claude/claudeos/**` | テンプレートから 93ファイルを配備済みに同期（agents/skills/docs/commands等） |
+
+### ✅ 主な改善内容
+
+- **サーバー自動再起動**: `npm run start:watch` でファイル変更を監視して自動再起動
+- **SSE Token 認証**: EventSource は Authorization ヘッダ非対応のため URL token 方式を実装
+- **パフォーマンス改善**: /api/system-health 4.95s → 0.245s (2nd call, キャッシュ効果)
+- **Gate-1 検証完了**: #1/#9/#10/#22/#51/#71/#111/#141/#231-241 全実施・PASS
+- **SOT ドリフト**: 41 → 29 ファイル差（テンプレート未デプロイ: 0件達成）
+
+---
+
 ## [v3.3.4] - 2026-05-30 — Cron 実データ CRUD API + WebUI 登録/削除 フォーム
 
 ### 🎯 概要
