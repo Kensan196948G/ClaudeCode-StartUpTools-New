@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "description": "ClaudeOS Trust Ledger — CI実績に基づく自律判断範囲スコア",
-  "updated_at": "2026-05-27T11:45:27.493Z",
+  "updated_at": "2026-05-30T06:40:00.657Z",
   "score": 0.9,
   "level": 3,
   "auto_merge_enabled": true,
@@ -11,8 +11,8 @@
     "ci_success_streak": 22,
     "blocked_events": 0,
     "last_ci_outcome": "success",
-    "last_updated": "2026-05-27T11:45:27.493Z",
-    "total_sessions": 31,
-    "stable_achievements": 31
+    "last_updated": "2026-05-30T06:40:00.657Z",
+    "total_sessions": 74,
+    "stable_achievements": 74
   }
 }

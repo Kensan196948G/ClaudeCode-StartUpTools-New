@@ -1,0 +1,79 @@
+name: Blocked Events Update
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+
+jobs:
+  update-blocked-events:
+    if: github.event.label.name == 'blocked'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: main
+
+      - name: Increment blocked_events in trust-score.json
+        run: |
+          python3 - <<'EOF'
+          import json
+          from datetime import datetime, timezone
+
+          TRUST_FILE = ".claude/claudeos/data/trust-score.json"
+
+          try:
+              with open(TRUST_FILE) as f:
+                  trust = json.load(f)
+          except Exception:
+              print("trust-score.json not found, skipping")
+              exit(0)
+
+          h = trust.setdefault("history", {})
+          h["blocked_events"] = h.get("blocked_events", 0) + 1
+          now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          h["last_updated"] = now
+
+          total   = h.get("total_ci_runs", 0)
+          success = h.get("successful_ci_runs", 0)
+          streak  = h.get("ci_success_streak", 0)
+          blocked = h["blocked_events"]
+
+          base_score    = (success / total) * 0.5 if total > 0 else 0.0
+          streak_bonus  = min(streak / 10, 1.0) * 0.1
+          block_penalty = min(blocked * 0.05, 0.2)
+          score = max(0.0, min(1.0, base_score + streak_bonus - block_penalty))
+
+          old_level = trust.get("level", 1)
+          level = 3 if score >= 0.87 else 2 if score >= 0.75 else 1
+
+          trust["score"]              = round(score, 4)
+          trust["level"]              = level
+          trust["auto_merge_enabled"] = score >= 0.75
+          trust["updated_at"]         = now
+          trust["history"]            = h
+
+          with open(TRUST_FILE, "w", encoding="utf-8") as f:
+              json.dump(trust, f, indent=2, ensure_ascii=False)
+
+          print(f"[Trust Score] blocked_events={blocked} score={score:.4f} level={level}")
+          EOF
+
+      - name: Commit blocked_events update
+        run: |
+          git config user.name  "ClaudeOS Trust Bot"
+          git config user.email "claudeos@github-actions[bot]"
+          git add .claude/claudeos/data/trust-score.json
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          SCORE=$(python3 -c "import json; d=json.load(open('.claude/claudeos/data/trust-score.json')); print(d['score'])")
+          LEVEL=$(python3 -c "import json; d=json.load(open('.claude/claudeos/data/trust-score.json')); print(d['level'])")
+          BLOCKED=$(python3 -c "import json; d=json.load(open('.claude/claudeos/data/trust-score.json')); print(d['history']['blocked_events'])")
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "chore(trust): Blocked #${ISSUE_NUM} → blocked=${BLOCKED} score=${SCORE} level=${LEVEL} [skip ci]"
+            git push 2>&1 || echo "[Trust] Push blocked by branch protection; score logged only."
+          fi

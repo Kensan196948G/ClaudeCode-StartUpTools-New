@@ -1194,7 +1194,7 @@ function handleJobStatus(res) {
 }
 
 // ── System Health ─────────────────────────────────────────────────────────
-const SKIP_DIRS = new Set(['node_modules', '.git', '__pycache__', '.venv', 'dist', 'build']);
+const SKIP_DIRS = new Set(['node_modules', '.git', '__pycache__', '.venv', 'dist', 'build', 'snapshots']);
 
 function countFiles(dir) {
   let n = 0;

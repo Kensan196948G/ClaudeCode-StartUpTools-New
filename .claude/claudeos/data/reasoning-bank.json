@@ -34,6 +34,139 @@
       "last_used": "2026-05-27T11:45:27.559Z"
     },
     {
+      "id": "rb-2026-05-28T23-15-05-97yj",
+      "timestamp": "2026-05-28T23:15:05.847Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Monitor",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 9,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 1,
+      "used_count": 8,
+      "last_used": "2026-05-28T23:52:49.167Z"
+    },
+    {
+      "id": "rb-2026-05-29T00-03-21-lz7h",
+      "timestamp": "2026-05-29T00:03:21.375Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Monitor",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 29,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 1,
+      "used_count": 28,
+      "last_used": "2026-05-29T23:56:05.464Z"
+    },
+    {
+      "id": "rb-2026-05-30T00-04-01-fp94",
+      "timestamp": "2026-05-30T00:04:01.989Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Monitor",
+      "problem_pattern": "修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化",
+      "approach": "v3.2.89 (PR #251) merge 完了。README バージョンドリフト修正 (v3.2.80→v3.2.89) + Watch-ClaudeLog.ps1 FilterLine 名前付き関数化 (CodeRabbit Medium対応)。CI 4/4 SUCCESS。",
+      "tags": [
+        "ci",
+        "pr",
+        "docs",
+        "powershell"
+      ],
+      "outcome": "success",
+      "success_count": 2,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 5,
+      "confidence": 1,
+      "used_count": 1,
+      "last_used": "2026-05-30T00:20:41.943Z"
+    },
+    {
+      "id": "rb-2026-05-30T04-55-33-ypf2",
+      "timestamp": "2026-05-30T04:55:33.240Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "修正 / ジョブ履歴永続化 / Dependabot#289 / Playwright WebUI確認 / gitignore",
+      "approach": "v3.3.2: Basic Auth / package.json / .claude/skills / PSScriptAnalyzer28→11 / SOT修正 / ジョブ履歴永続化 / Dependabot#289 / Playwright WebUI確認 / gitignore PNG除外。Pester 800件 CI SUCCESS。",
+      "tags": [
+        "ci",
+        "auth"
+      ],
+      "outcome": "success",
+      "success_count": 1,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 3,
+      "confidence": 0.95,
+      "used_count": 0,
+      "last_used": "2026-05-30T04:55:33.240Z"
+    },
+    {
+      "id": "rb-2026-05-30T05-47-13-0w7h",
+      "timestamp": "2026-05-30T05:47:13.739Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "v3.3.3: PSScriptAnalyzer 0件 + security(timingSafeEqual/URLpath) + Playwright E2E + STABLE実API化。CI SU",
+      "approach": "v3.3.3: PSScriptAnalyzer 0件 + security(timingSafeEqual/URLpath) + Playwright E2E + STABLE実API化。CI SUCCESS。",
+      "tags": [
+        "ci",
+        "security",
+        "stable"
+      ],
+      "outcome": "success",
+      "success_count": 1,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 3,
+      "confidence": 0.95,
+      "used_count": 0,
+      "last_used": "2026-05-30T05:47:13.739Z"
+    },
+    {
+      "id": "rb-2026-05-30T06-40-00-jlpl",
+      "timestamp": "2026-05-30T06:40:00.722Z",
+      "project": "ClaudeCode-StartUpTools-New",
+      "phase": "Improve",
+      "problem_pattern": "v3.3.4: Cron CRUD API + WebUI登録/削除フォーム + Pester19件全PASS + E2E登録テスト。CI SUCCESS。PSScriptAnalyzer 0件継続。",
+      "approach": "v3.3.4: Cron CRUD API + WebUI登録/削除フォーム + Pester19件全PASS + E2E登録テスト。CI SUCCESS。PSScriptAnalyzer 0件継続。",
+      "tags": [
+        "ci",
+        "cron"
+      ],
+      "outcome": "success",
+      "success_count": 1,
+      "failure_count": 0,
+      "stable_achieved": true,
+      "ci_passed": true,
+      "consecutive_success": 3,
+      "confidence": 0.95,
+      "used_count": 0,
+      "last_used": "2026-05-30T06:40:00.722Z"
+    },
+    {
       "id": "rb-2026-05-20T04-43-54-cuf0",
       "timestamp": "2026-05-20T04:43:54.601Z",
       "project": "ClaudeCode-StartUpTools-New",
@@ -52,7 +185,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.8,
+      "confidence": 0.57,
       "used_count": 12,
       "last_used": "2026-05-20T07:13:25.498Z"
     },
@@ -75,7 +208,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.54,
+      "confidence": 0.42,
       "used_count": 23,
       "last_used": "2026-05-16T07:09:28.043Z"
     },
@@ -98,7 +231,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.41,
+      "confidence": 0.36,
       "used_count": 31,
       "last_used": "2026-05-13T05:19:20.458Z"
     },
@@ -121,7 +254,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.41,
+      "confidence": 0.35,
       "used_count": 29,
       "last_used": "2026-05-12T23:59:05.186Z"
     },
@@ -144,7 +277,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.4,
+      "confidence": 0.34,
       "used_count": 21,
       "last_used": "2026-05-12T11:18:38.046Z"
     },
@@ -167,7 +300,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.38,
+      "confidence": 0.33,
       "used_count": 11,
       "last_used": "2026-05-11T12:29:59.083Z"
     },
@@ -190,7 +323,7 @@
       "stable_achieved": true,
       "ci_passed": true,
       "consecutive_success": 5,
-      "confidence": 0.35,
+      "confidence": 0.31,
       "used_count": 2,
       "last_used": "2026-05-10T02:35:22.623Z"
     },
