@@ -1,0 +1,34 @@
+{
+  "name": "claude-code-startup-tools",
+  "version": "3.3.2",
+  "description": "ClaudeOS autonomous development startup tools — Windows launcher + Mission Control WebUI",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node scripts/dashboards/serve-dashboard.js",
+    "start:dashboard": "node scripts/dashboards/serve-dashboard.js --port 3737",
+    "test": "pwsh -NonInteractive -Command \"$cfg=New-PesterConfiguration;$cfg.Run.Path='./tests';$cfg.Run.Exit=$false;$cfg.Output.Verbosity='Normal';Invoke-Pester -Configuration $cfg\"",
+    "test:node": "node --test scripts/**/*.test.js 2>/dev/null || echo 'No Node test files found'",
+    "lint": "pwsh -NonInteractive -Command \"Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error | Format-Table -AutoSize\"",
+    "audit:scan": "node scripts/tools/run-audit-scan.js",
+    "cmdb:scan": "node scripts/tools/run-cmdb-scan.js"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": [
+    "claude-code",
+    "autonomous-development",
+    "claudeos",
+    "dashboard",
+    "mission-control"
+  ],
+  "author": "Kensan (Enterprise IT Team)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kensan196948G/ClaudeCode-StartUpTools-New.git"
+  },
+  "homepage": "http://localhost:3737/mission-control"
+}

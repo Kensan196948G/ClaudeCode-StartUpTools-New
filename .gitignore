@@ -130,6 +130,10 @@ reports/dashboards/
 reports/lint-summary.json
 reports/coverage-summary.json
 reports/deploy-runbook.md
+reports/audit/
+reports/cmdb/
+reports/deploy-runbook-*.md
+reports/ultrareview/
 
 # バックアップディレクトリ
 scripts/claudeos-back/

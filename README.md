@@ -10,6 +10,9 @@
 > **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
 > Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
+> **🔐 v3.3.2 — WebUI Basic Auth + package.json + .claude/skills/ + state.json 整備**
+> `DASHBOARD_PASSWORD` 環境変数または `config.json.dashboardAuth.password` による HTTP Basic Auth を実装（LAN 公開時の最低限アクセス制御）。`package.json` を正式作成（Node 18+ 依存管理・`npm start` でダッシュボード起動）。Claude Code 2.1.157 準拠の `.claude/skills/` ディレクトリを新設（CTO セッション開始・WebUI ヘルスチェックスキル）。`state.json` の 150+ 重複 warnings エントリを圧縮（2009行 → 355行）。`.gitignore` に `reports/audit/` `reports/cmdb/` `reports/deploy-runbook-*.md` を追加。
+
 > **🎨 v3.3.1 — Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新**
 > Cron管理週間スケジュール全幅レイアウト・正式名称2行表示・Boot Sequenceアクティブセッションパネル・イベントログ日本語化など、Mission Control WebUI のUX/UI を全面強化。`/goal` テンプレートを「MVP Release Candidate 完成版」（完了条件10項・対象外・停止条件明記）に刷新。
 
@@ -36,12 +39,12 @@
 
 | 項目 | 状態 |
 |------|------|
-| バージョン | **v3.3.1** (Mission Control ダッシュボード全面改善 + /goal MVP RC テンプレート刷新) — 旧: v3.3.0 |
+| バージョン | **v3.3.2** (WebUI Basic Auth + package.json + .claude/skills + state.json 整備) — 旧: v3.3.1 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |
 | Agents | **28体** の特化サブエージェント (2026Q2 棚卸し後、追加復元済み) |
-| Skills | **0個** — Claude Opus 4.6 内包能力で代替可能な汎用スキルを棚卸しで全削除 |
+| Skills | **2個** — `cto-session-start`（CTO 全権委任セッション起動）/ `webui-health-check`（WebUI 健全性確認） |
 | Hooks | **4個** — agent-risk-check / capture-result / onboarding-refresh / usage-history-recorder |
 | Boot Sequence | `Start-ClaudeOS.ps1` (Step 3 Memory/Step 5 Executive Init/Step 6 Management Init/Step 7 Agent Init/Step 8 Loop Engine Start/Step 9 Dashboard 実装完了) ✅ |
 

@@ -85,6 +85,9 @@ function findConfig(filename) {
 let PROJECTS_DIR = (process.env.AI_STARTUP_PROJECTS_DIR || 'D:\\').replace(/\\/g, path.sep);
 let LINUX_BASE   = '/home/kensan/Projects';
 let LINUX_HOST   = '';
+// Basic Auth: DASHBOARD_PASSWORD env var OR config.json.dashboardAuth.password
+let AUTH_USER = process.env.DASHBOARD_USER || 'admin';
+let AUTH_PASS = process.env.DASHBOARD_PASSWORD || '';
 try {
   const cfgPath = findConfig('config.json');
   if (cfgPath) {
@@ -92,8 +95,37 @@ try {
     if (cfg.projectsDir) PROJECTS_DIR = cfg.projectsDir.replace(/\\/g, path.sep);
     if (cfg.linuxBase)   LINUX_BASE   = cfg.linuxBase;
     if (cfg.linuxHost)   LINUX_HOST   = cfg.linuxHost;
+    if (cfg.dashboardAuth?.password && !AUTH_PASS) {
+      AUTH_USER = cfg.dashboardAuth.user     || AUTH_USER;
+      AUTH_PASS = cfg.dashboardAuth.password;
+    }
   }
 } catch { /* 読み取り失敗は無視 */ }
+
+/** HTTP Basic Auth check — returns true if authorized (or auth disabled).
+ *  Call this at the TOP of each request handler; on failure it writes 401 and returns false.
+ *  /api/health is always exempt so monitoring probes are never blocked.
+ */
+function checkBasicAuth(req, res) {
+  if (!AUTH_PASS) return true;                       // auth disabled
+  if (req.url === '/api/health' || req.url === '/health') return true; // always public
+  const header = req.headers['authorization'] || '';
+  if (header.startsWith('Basic ')) {
+    const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
+    const colon   = decoded.indexOf(':');
+    if (colon !== -1) {
+      const user = decoded.slice(0, colon);
+      const pass = decoded.slice(colon + 1);
+      if (user === AUTH_USER && pass === AUTH_PASS) return true;
+    }
+  }
+  res.writeHead(401, {
+    'WWW-Authenticate': 'Basic realm="ClaudeOS Dashboard"',
+    'Content-Type': 'text/plain; charset=utf-8',
+  });
+  res.end('401 Unauthorized — Set DASHBOARD_PASSWORD env var or config.json dashboardAuth to enable access.');
+  return false;
+}
 
 // github-registry.json を読む (静的マッピング)
 let GITHUB_REGISTRY = {};
@@ -1117,7 +1149,7 @@ function handleSystemHealth(res) {
   c.claudeSkillsMissing = !fs.existsSync(path.join(PROJ_ROOT, '.claude', 'skills'));
   // CORS / Auth
   c.corsEnabled  = true;
-  c.authEnabled  = false;
+  c.authEnabled  = !!AUTH_PASS;  // true when DASHBOARD_PASSWORD env or config.json.dashboardAuth set
   // Job history persistence
   c.jobHistoryPersisted = false;
   // Untracked files
@@ -1235,8 +1267,11 @@ if (require.main === module) {
     // CORS for LAN access (dashboard is local-network only, no external exposure)
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+    // Basic Auth guard (skips /api/health; disabled when DASHBOARD_PASSWORD is unset)
+    if (!checkBasicAuth(req, res)) return;
 
     if (req.url === '/health' || req.url === '/api/health') {
       const ts = readTrustScore();
