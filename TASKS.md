@@ -100,7 +100,8 @@
 91. [DONE] [Priority:P1][Owner:Security][Source:CodeRabbit] v3.3.3 セキュリティ修正 — crypto.timingSafeEqual / URLパス正規化 / リングバッファ定数化
 92. [DONE] [Priority:P2][Owner:QA][Source:Manual] v3.3.3 Playwright E2E 全9パネル検証 + STABLE実API化(2/3amber→3/3green)
 93. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.4 Cron CRUD API + WebUI 登録フォーム — GET/POST/DELETE /api/cron / CronRegisterModal / 削除確認ダイアログ / E2E検証済み
-94. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.5 WebUI 全テスト + サーバー自動再起動 + SSE認証改善
+94. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.5 サーバー自動再起動+SSE Token認証+Gate-1 13項目+SOT 93ファイル同期+パフォーマンス改善
+95. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.6 WebUI 完全 250項目チェックリスト Gate-2/3 + PR作成 + Codex review
 
 ## Auto Extracted From Agent Teams Matrix
 
