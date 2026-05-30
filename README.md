@@ -10,6 +10,9 @@
 > **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
 > Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
+> **🕐 v3.3.4 — Cron 実データ CRUD API + WebUI 登録/削除フォーム**
+> GET/POST/DELETE `/api/cron` を実装。Cron パネルが cron-registry.json の実データを30秒ポーリングで取得。新規登録フォーム（曜日トグル付き）と削除ボタン（確認ダイアログ）を追加。実 crontab への反映は「CLI正本」アーキテクチャに従い CLI [14] に委ねる設計。
+
 > **✅ v3.3.3 — PSScriptAnalyzer 0件達成 + STABLE実API化 + E2E全パネル検証**
 > PSScriptAnalyzer 警告を 28 → 0 件に完全解消（Write-Log リネーム / empty catch 修正 / SuppressMessage 正位置）。Mission Control 全9パネルを Playwright E2E で動作確認。CI/GitHub パネルの STABLE 判定を実 API データ化（2/3amber → 3/3green）。
 
@@ -42,7 +45,7 @@
 
 | 項目 | 状態 |
 |------|------|
-| バージョン | **v3.3.3** (PSScriptAnalyzer 0件達成 + STABLE実API化 + E2E全パネル検証) — 旧: v3.3.2 |
+| バージョン | **v3.3.4** (Cron 実データ CRUD + WebUI 登録/削除フォーム) — 旧: v3.3.3 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |

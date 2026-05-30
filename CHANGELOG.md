@@ -2,6 +2,27 @@
 
 # CHANGELOG
 
+## [v3.3.4] - 2026-05-30 — Cron 実データ CRUD API + WebUI 登録/削除 フォーム
+
+### 🎯 概要
+Mission Control の Cron パネルをリアルデータ + CRUD 対応に強化。
+
+### 🔧 変更対象
+
+| ファイル | 変更内容 |
+|---|---|
+| `scripts/dashboards/serve-dashboard.js` | GET/POST/DELETE `/api/cron` 追加 / cron-registry.json アトミック書き込み / SSE cron-change イベント |
+| `scripts/dashboards/mission-control.html` | CronRegisterModal / 削除確認ダイアログ / 30秒ポーリング実データ取得 |
+
+### ✅ 主な改善内容
+
+- **GET /api/cron**: nextRun を現在時刻から正確計算、全エントリ拡張データ返却
+- **POST /api/cron**: 重複チェック・入力バリデーション・crypto ID 自動生成・アトミック保存
+- **DELETE /api/cron/:id**: 確認ダイアログ付き削除、SSE でリアルタイム通知
+- **CLI 正本維持**: 実 crontab への反映は CLI [14] に委ねる設計を明記
+
+---
+
 ## [v3.3.3] - 2026-05-30 — PSScriptAnalyzer 0件達成 + STABLE実API化 + E2E全パネル検証
 
 ### 🎯 概要
