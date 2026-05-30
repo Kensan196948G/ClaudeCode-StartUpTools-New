@@ -27,7 +27,11 @@ LAN 公開中の Mission Control WebUI にオプション型 HTTP Basic Auth を
 - **`.claude/skills/`**: Claude Code 2.1.157 準拠ディレクトリを新設（2スキル）
 - **state.json 圧縮**: 重複 `tdd_required` warnings 150+ エントリを 5 エントリに整理（2009行 → 355行）
 - **ジョブ履歴**: インメモリ → ファイル永続化（再起動後も履歴を保持）
-- **README 更新**: Basic Auth セットアップ手順・config.json 設定例を追加
+- **README 更新**: Basic Auth セットアップ手順・config.json 設定例 + Mission Control WebUI 機能行追加
+- **PSScriptAnalyzer 警告**: 28 → 11 件削減（BOM 15ファイル追加 / empty catch 6件 `$null=$_` 修正 / 関数名タイポ2件修正）
+- **SOT ドリフト修正**: `countFiles()` から `node_modules` 除外 → 1726 → 41 ファイル差に正規化
+- **Dependabot #289**: actions/checkout v4 → v6 へアップグレード
+- **reports/ .gitignore**: `reports/audit/` `reports/cmdb/` `reports/deploy-runbook-*.md` を追加
 
 ---
 
