@@ -1233,6 +1233,125 @@ function handleSystemHealth(res) {
   res.end(JSON.stringify({ checks: c, generated: new Date().toISOString() }, null, 2));
 }
 
+// ── Cron Registry CRUD ────────────────────────────────────────────────────
+
+/** Read cron-registry.json safely */
+function readCronRegistry() {
+  try {
+    if (!fs.existsSync(CRON_REG)) return [];
+    return JSON.parse(fs.readFileSync(CRON_REG, 'utf8'));
+  } catch { return []; }
+}
+
+/** Write cron-registry.json atomically */
+function writeCronRegistry(entries) {
+  const dir = path.dirname(CRON_REG);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const tmp = CRON_REG + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(entries, null, 2), 'utf8');
+  fs.renameSync(tmp, CRON_REG);
+}
+
+/** GET /api/cron — list with enhanced next-run calculation */
+function handleCronList(res) {
+  const entries = readCronRegistry();
+  const enhanced = entries.map(e => {
+    // Build cron expression
+    const [hh, mm] = (e.Time || '09:00').split(':');
+    const min  = parseInt(mm || '0') || 0;
+    const hour = parseInt(hh) || 9;
+    const dows = Array.isArray(e.DayOfWeek) ? e.DayOfWeek : [1];
+    const scheduleExpr = `${min} ${hour} * * ${dows.join(',')}`;
+
+    // Compute next run
+    const dowSet = new Set(dows);
+    let nextDate = null;
+    const now = new Date();
+    for (let i = 0; i <= 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() + i);
+      d.setHours(hour, min, 0, 0);
+      if (i === 0 && d <= now) continue;
+      if (dowSet.has(d.getDay())) { nextDate = d; break; }
+    }
+    const nextRun = nextDate
+      ? `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')} ${String(nextDate.getHours()).padStart(2,'0')}:${String(nextDate.getMinutes()).padStart(2,'0')}`
+      : '—';
+
+    return {
+      id:              e.Id,
+      project:         e.Project,
+      linuxHost:       e.LinuxHost || '',
+      dayOfWeek:       dows,
+      time:            e.Time || '09:00',
+      durationMinutes: e.DurationMinutes || 300,
+      registeredAt:    e.RegisteredAt || '',
+      schedule:        scheduleExpr,
+      nextRun,
+    };
+  });
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+  res.end(JSON.stringify({ entries: enhanced, count: enhanced.length, generated: new Date().toISOString() }, null, 2));
+}
+
+/** POST /api/cron — register new cron entry */
+function handleCronRegister(req, res) {
+  let body = '';
+  req.on('data', chunk => { body += chunk; });
+  req.on('end', () => {
+    let data;
+    try { data = JSON.parse(body); } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      return;
+    }
+    const { project, linuxHost, dayOfWeek, time, durationMinutes } = data;
+    if (!project || typeof project !== 'string' || project.trim().length === 0) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'project is required' }));
+      return;
+    }
+    const dows = Array.isArray(dayOfWeek) ? dayOfWeek.map(Number).filter(n => n >= 0 && n <= 6) : [1];
+    const entries = readCronRegistry();
+    const existing = entries.find(e => e.Project === project.trim());
+    if (existing) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Project already registered', id: existing.Id }));
+      return;
+    }
+    const newEntry = {
+      Id:              crypto.randomBytes(4).toString('hex'),
+      Project:         project.trim(),
+      LinuxHost:       linuxHost || '',
+      DayOfWeek:       dows,
+      Time:            String(time || '09:00').replace(/[^0-9:]/g, ''),
+      DurationMinutes: Math.min(Math.max(parseInt(durationMinutes) || 300, 30), 600),
+      RegisteredAt:    new Date().toISOString(),
+    };
+    entries.push(newEntry);
+    writeCronRegistry(entries);
+    pushEvent('cron-change', { action: 'register', id: newEntry.Id, project: newEntry.Project });
+    res.writeHead(201, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ ok: true, entry: newEntry }));
+  });
+}
+
+/** DELETE /api/cron/:id — unregister cron entry */
+function handleCronDelete(req, res, id) {
+  const entries = readCronRegistry();
+  const idx = entries.findIndex(e => e.Id === id);
+  if (idx === -1) {
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Entry not found', id }));
+    return;
+  }
+  const removed = entries.splice(idx, 1)[0];
+  writeCronRegistry(entries);
+  pushEvent('cron-change', { action: 'delete', id, project: removed.Project });
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ ok: true, removed: { id, project: removed.Project } }));
+}
+
 function handleSSE(req, res) {
   res.writeHead(200, {
     'Content-Type':                'text/event-stream',
@@ -1344,6 +1463,13 @@ if (require.main === module) {
     if (pn === '/api/jobs/status')                    { return handleJobStatus(res); }
     if (pn === '/api/events')                         { return handleSSE(req, res); }
     if (pn === '/api/system-health')                  { return handleSystemHealth(res); }
+    // Cron registry CRUD
+    if (req.method === 'GET'    && pn === '/api/cron') { return handleCronList(res); }
+    if (req.method === 'POST'   && pn === '/api/cron') { return handleCronRegister(req, res); }
+    if (req.method === 'DELETE' && pn.startsWith('/api/cron/')) {
+      const id = pn.replace('/api/cron/', '');
+      return handleCronDelete(req, res, id);
+    }
     if (pn === '/mission-control' || pn === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());

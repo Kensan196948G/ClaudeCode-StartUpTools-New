@@ -1601,16 +1601,112 @@ function formatNextRunDisplay(nextRunStr, expr) {
   return "—";
 }
 
+// ── CronRegisterModal — 新規登録フォーム ─────────────────────────────────
+function CronRegisterModal({ onClose, onRegistered }) {
+  const [form, setForm] = React.useState({
+    project: '', linuxHost: '192.168.0.185',
+    dayOfWeek: [1,2,3,4,5,6], time: '09:00', durationMinutes: 300
+  });
+  const [error, setError] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
+  const DOW_LABELS = ['日','月','火','水','木','金','土'];
+
+  const toggleDow = (n) => setForm(f => ({
+    ...f, dayOfWeek: f.dayOfWeek.includes(n) ? f.dayOfWeek.filter(x => x !== n) : [...f.dayOfWeek, n].sort()
+  }));
+
+  const submit = async () => {
+    if (!form.project.trim()) { setError('プロジェクト名は必須です'); return; }
+    setSaving(true); setError('');
+    try {
+      const r = await fetch('/api/cron', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(form) });
+      const d = await r.json();
+      if (!r.ok) { setError(d.error || 'Error'); setSaving(false); return; }
+      onRegistered(d.entry);
+      onClose();
+    } catch (e) { setError(String(e)); setSaving(false); }
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9000 }}>
+      <div style={{ background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:8, padding:24, width:420, fontFamily:MC.font }}>
+        <h3 style={{ margin:'0 0 16px', color:MC.text, fontSize:14 }}>🕐 Cron スケジュール新規登録</h3>
+        <p style={{ margin:'0 0 12px', fontSize:11, color:MC.textMuted }}>⚠️ ローカル台帳への追加のみ。実 crontab への反映はCLI [14] を実行してください。</p>
+        {[
+          { label:'プロジェクト名', key:'project', type:'text', placeholder:'MyProject' },
+          { label:'Linux ホスト', key:'linuxHost', type:'text', placeholder:'192.168.0.185' },
+          { label:'開始時刻 (HH:MM)', key:'time', type:'text', placeholder:'09:00' },
+          { label:'実行時間 (分)', key:'durationMinutes', type:'number', placeholder:'300' },
+        ].map(({ label, key, type, placeholder }) => (
+          <div key={key} style={{ marginBottom:10 }}>
+            <label style={{ display:'block', fontSize:11, color:MC.textDim, marginBottom:4 }}>{label}</label>
+            <input type={type} value={form[key]} placeholder={placeholder}
+              onChange={e => setForm(f => ({...f, [key]: type==='number' ? parseInt(e.target.value)||0 : e.target.value}))}
+              style={{ width:'100%', padding:'6px 8px', background:MC.bg, border:`1px solid ${MC.border}`, borderRadius:4, color:MC.text, fontSize:12, boxSizing:'border-box' }} />
+          </div>
+        ))}
+        <div style={{ marginBottom:14 }}>
+          <label style={{ display:'block', fontSize:11, color:MC.textDim, marginBottom:6 }}>実行曜日</label>
+          <div style={{ display:'flex', gap:6 }}>
+            {DOW_LABELS.map((l,n) => (
+              <button key={n} onClick={() => toggleDow(n)} style={{
+                padding:'4px 8px', borderRadius:4, fontSize:11, cursor:'pointer',
+                background: form.dayOfWeek.includes(n) ? MC.accent : 'transparent',
+                color: form.dayOfWeek.includes(n) ? '#000' : MC.textMuted,
+                border: `1px solid ${form.dayOfWeek.includes(n) ? MC.accent : MC.border}`,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+        {error && <div style={{ color:'#f66', fontSize:11, marginBottom:10 }}>❌ {error}</div>}
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button onClick={onClose} style={{ padding:'6px 16px', borderRadius:4, border:`1px solid ${MC.border}`, background:'transparent', color:MC.textDim, cursor:'pointer' }}>キャンセル</button>
+          <button onClick={submit} disabled={saving} style={{ padding:'6px 16px', borderRadius:4, border:'none', background:MC.accent, color:'#000', fontWeight:600, cursor: saving ? 'wait' : 'pointer' }}>
+            {saving ? '登録中...' : '✅ 登録'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const CronPanel = ({ liveData }) => {
   const [schedules, setSchedules] = React.useState(window.CRON_SCHEDULES);
-  const [showAdd, setShowAdd] = React.useState(false);
+  const [showAdd, setShowAdd]   = React.useState(false);
+  const [delConfirm, setDelConfirm] = React.useState(null); // { id, project }
 
-  // liveData.cronSchedules が更新されたら即座に同期（30秒ポーリング連動）
+  // /api/cron からリアルデータを取得（30秒ポーリング）
+  React.useEffect(() => {
+    const load = () => fetch('/api/cron').then(r => r.json()).then(d => {
+      if (d.entries?.length) {
+        setSchedules(d.entries.map(e => ({
+          project: e.project, host: e.linuxHost || '—',
+          schedule: e.schedule, duration: e.durationMinutes,
+          status: 'active', lastRun: e.registeredAt?.slice(0,10) || '—',
+          nextRun: e.nextRun, result: 'success',
+          _id: e.id,
+        })));
+      }
+    }).catch(() => {});
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  // liveData.cronSchedules は cron-change SSE イベントで更新されたとき即時反映
   React.useEffect(() => {
     if (liveData?.cronSchedules?.length) {
-      setSchedules([...liveData.cronSchedules]);
+      setSchedules(liveData.cronSchedules);
     }
   }, [liveData?.cronSchedules]);
+
+  const handleDelete = async (id, project) => {
+    const r = await fetch(`/api/cron/${id}`, { method:'DELETE' });
+    if (r.ok) {
+      setSchedules(prev => prev.filter(s => s._id !== id));
+      setDelConfirm(null);
+    }
+  };
 
   const togglePause = (idx) => setSchedules(prev =>
     prev.map((s,i) => i===idx ? {...s, status: s.status==="active" ? "paused" : "active"} : s)
@@ -1635,16 +1731,38 @@ const CronPanel = ({ liveData }) => {
         <div style={{ minWidth:0 }}>
 
         {/* ── Schedule table ── */}
+        {showAdd && <CronRegisterModal onClose={() => setShowAdd(false)} onRegistered={entry => {
+          setSchedules(prev => [...prev, {
+            project: entry.Project, host: entry.LinuxHost || '—',
+            schedule: `${parseInt((entry.Time||'09:00').split(':')[1])} ${parseInt((entry.Time||'09:00').split(':')[0])} * * ${(entry.DayOfWeek||[1]).join(',')}`,
+            duration: entry.DurationMinutes, status: 'active',
+            lastRun: entry.RegisteredAt?.slice(0,10) || '—', nextRun: '—', result: 'success', _id: entry.Id,
+          }]);
+        }} />}
+
+        {delConfirm && (
+          <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9000 }}>
+            <div style={{ background:MC.bgPanel, border:`1px solid ${MC.red}`, borderRadius:8, padding:24, width:360 }}>
+              <h3 style={{ color:MC.red, margin:'0 0 12px' }}>🗑 Cron 登録削除</h3>
+              <p style={{ color:MC.text, fontSize:13 }}>「{delConfirm.project}」をローカル台帳から削除しますか？</p>
+              <p style={{ color:MC.textMuted, fontSize:11 }}>実 crontab は変更されません。CLI [14] で別途削除してください。</p>
+              <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
+                <button onClick={() => setDelConfirm(null)} style={{ padding:'6px 16px', borderRadius:4, border:`1px solid ${MC.border}`, background:'transparent', color:MC.textDim, cursor:'pointer' }}>キャンセル</button>
+                <button onClick={() => handleDelete(delConfirm.id, delConfirm.project)} style={{ padding:'6px 16px', borderRadius:4, border:'none', background:MC.red, color:'#fff', fontWeight:600, cursor:'pointer' }}>削除</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Panel title="Cronスケジュール一覧" icon="🕐" headerRight={
           <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <span style={{ fontSize:10, color:MC.amber, fontFamily:MC.mono, border:`1px solid ${MC.amber}44`, borderRadius:3, padding:"2px 7px" }}>
-              👁 表示専用 — 変更はCLI [14]
+              ⚠️ 台帳のみ — crontab反映はCLI [14]
             </span>
-            <button onClick={() => setShowAdd(!showAdd)} style={{
-              padding:"4px 12px", borderRadius:4, border:`1px solid ${MC.border}`,
-              background:"transparent", color:MC.textMuted, fontSize:11, fontWeight:600,
-              cursor:"not-allowed", opacity:0.4,
-            }} title="Cron登録はCLIメニュー [14] を使用してください" disabled>＋ 新規登録</button>
+            <button onClick={() => setShowAdd(true)} style={{
+              padding:"4px 12px", borderRadius:4, border:`1px solid ${MC.accent}`,
+              background:"transparent", color:MC.accent, fontSize:11, fontWeight:600, cursor:"pointer",
+            }}>＋ 新規登録</button>
           </div>
         } noPad>
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
@@ -1686,16 +1804,19 @@ const CronPanel = ({ liveData }) => {
                       : <span style={{ color:MC.text }}>{formatNextRunDisplay(s.nextRun, s.schedule)}</span>
                     }
                   </td>
-                  <td style={{ padding:"8px 10px" }}>
-                    <span
-                      title="表示専用 — 実crontabへの反映はCLIメニュー [14] を使用してください"
+                  <td style={{ padding:"8px 6px" }}>
+                    <button
+                      onClick={() => s._id && setDelConfirm({ id: s._id, project: s.project })}
+                      title={s._id ? "台帳から削除（実crontabは変更なし）" : "IDなし（削除不可）"}
                       style={{
-                        display:"inline-block", padding:"3px 8px", borderRadius:3,
-                        border:`1px solid ${MC.border}`, background:"transparent",
-                        color:MC.textMuted, fontSize:10, cursor:"not-allowed",
-                        whiteSpace:"nowrap", opacity:0.45, userSelect:"none",
+                        display:"inline-block", padding:"3px 7px", borderRadius:3,
+                        border:`1px solid ${s._id ? '#f6644444' : MC.border}`,
+                        background:"transparent",
+                        color: s._id ? '#f664' : MC.textMuted, fontSize:10,
+                        cursor: s._id ? "pointer" : "not-allowed",
+                        whiteSpace:"nowrap", opacity: s._id ? 1 : 0.4,
                       }}
-                    >{s.status==="active" ? "⏸ 停止" : "▶ 再開"}</span>
+                    >🗑 削除</button>
                   </td>
                 </tr>
               ))}
