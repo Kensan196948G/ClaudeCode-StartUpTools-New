@@ -166,3 +166,76 @@ console.log(JSON.stringify(result.map(r => r.project)));
         $script:FilterResult | Should -Not -Contain 'NoGit'
     }
 }
+
+Describe 'Cron Registry 関数 (node で検証)' {
+    BeforeAll {
+        if (-not $script:NodeExe) { return }
+        $cronRegPath = Join-Path $TestDrive 'cron-registry.json'
+        @'
+[
+  {"Id": "test001", "Project": "TestProject", "LinuxHost": "192.168.0.1", "DayOfWeek": [1,2], "Time": "09:00", "DurationMinutes": 300, "RegisteredAt": "2026-01-01T00:00:00"}
+]
+'@ | Set-Content $cronRegPath -Encoding UTF8
+        $tmpJs = Join-Path $TestDrive 'cron-test.js'
+        $cronRegPathEsc = $cronRegPath.Replace('\', '\\')
+        @"
+const fs = require('fs'), crypto = require('crypto');
+const CRON_REG = '$cronRegPathEsc';
+
+function readCronRegistry() {
+  try { return JSON.parse(fs.readFileSync(CRON_REG, 'utf8')); } catch { return []; }
+}
+function writeCronRegistry(entries) {
+  const tmp = CRON_REG + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(entries, null, 2), 'utf8');
+  fs.renameSync(tmp, CRON_REG);
+}
+
+const result = {};
+
+// Test 1: readCronRegistry
+const entries = readCronRegistry();
+result.readCount = entries.length;
+result.firstProject = entries[0]?.Project;
+
+// Test 2: duplicate check
+const dup = entries.find(e => e.Project === 'TestProject');
+result.hasDuplicate = !!dup;
+
+// Test 3: add new entry
+const newEntry = { Id: crypto.randomBytes(4).toString('hex'), Project: 'NewProject', LinuxHost: '10.0.0.1', DayOfWeek: [3], Time: '14:00', DurationMinutes: 180, RegisteredAt: new Date().toISOString() };
+const newEntries = [...entries, newEntry];
+writeCronRegistry(newEntries);
+result.afterAddCount = readCronRegistry().length;
+
+// Test 4: delete entry
+const filtered = newEntries.filter(e => e.Id !== newEntry.Id);
+writeCronRegistry(filtered);
+result.afterDeleteCount = readCronRegistry().length;
+
+console.log(JSON.stringify(result));
+"@ | Set-Content $tmpJs -Encoding UTF8
+        $script:CronResult = & $script:NodeExe $tmpJs 2>$null | ConvertFrom-Json
+    }
+
+    It 'readCronRegistry が1件返すこと' {
+        if (-not $script:NodeExe) { Set-ItResult -Skipped -Because 'node not available' }
+        $script:CronResult.readCount | Should -Be 1
+    }
+    It '最初のエントリが TestProject であること' {
+        if (-not $script:NodeExe) { Set-ItResult -Skipped -Because 'node not available' }
+        $script:CronResult.firstProject | Should -Be 'TestProject'
+    }
+    It '重複チェック: TestProject は既存と判断されること' {
+        if (-not $script:NodeExe) { Set-ItResult -Skipped -Because 'node not available' }
+        $script:CronResult.hasDuplicate | Should -Be $true
+    }
+    It '新規登録後に件数が2件になること' {
+        if (-not $script:NodeExe) { Set-ItResult -Skipped -Because 'node not available' }
+        $script:CronResult.afterAddCount | Should -Be 2
+    }
+    It '削除後に件数が1件に戻ること' {
+        if (-not $script:NodeExe) { Set-ItResult -Skipped -Because 'node not available' }
+        $script:CronResult.afterDeleteCount | Should -Be 1
+    }
+}
