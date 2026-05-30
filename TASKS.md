@@ -99,7 +99,8 @@
 90. [DONE] [Priority:P3][Owner:Developer][Source:GitHub#301] v3.3.3 PSScriptAnalyzer 0件達成 — Write-Log リネーム / CronManager empty catch / SuppressMessage 8件 / 全11件解消
 91. [DONE] [Priority:P1][Owner:Security][Source:CodeRabbit] v3.3.3 セキュリティ修正 — crypto.timingSafeEqual / URLパス正規化 / リングバッファ定数化
 92. [DONE] [Priority:P2][Owner:QA][Source:Manual] v3.3.3 Playwright E2E 全9パネル検証 + STABLE実API化(2/3amber→3/3green)
-93. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.4 WebUI Cron実データAPI + SSE認証改善 + サーバー自動再起動仕組み
+93. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.4 Cron CRUD API + WebUI 登録フォーム — GET/POST/DELETE /api/cron / CronRegisterModal / 削除確認ダイアログ / E2E検証済み
+94. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.5 WebUI 全テスト + サーバー自動再起動 + SSE認証改善
 
 ## Auto Extracted From Agent Teams Matrix
 
