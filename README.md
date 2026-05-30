@@ -10,6 +10,9 @@
 > **🚀 ClaudeOS v9.0 — `/goal` + Agent Teams + Agent View 完全統合**
 > Claude Code v2.1.139+ の公式機能を全統合。`/goal` コマンドで達成条件を設定し Haiku が自動判定、Agent Teams で並列協調開発、`claude agents`（Agent View）でセッション監視。固定ループ → 動的判断型へ移行。詳細は [`CLAUDE.md`](./CLAUDE.md) を参照。
 
+> **🎨 v3.3.6 — Mission Control 6項目 UI 大幅改善**
+> Projects: Cron のみデフォルト表示（簡易 12件除外）/ Dashboard: 稼働プロジェクトバナー（名前/経過/フェーズ/Goal）/ 健全性: 全プロジェクト健全性テーブル / CI/GitHub: プロジェクト選択 + 全STABLE一覧タブ / Cron: 06/01(月) 08:30 フル日時表示。
+
 > **⚡ v3.3.5 — サーバー自動再起動 + SSE Token 認証 + Gate-1 + SOT 同期**
 > `npm run start:watch` でファイル変更を監視して自動再起動。EventSource 対応の URL token SSE 認証実装。/api/system-health を 15秒キャッシュ化（4.95s→0.245s）。Gate-1 必須13項目を全PASS。テンプレートから93ファイルを配備済みに同期（agents/skills/docs/commands等、SOT 未デプロイ 0件達成）。
 
@@ -48,7 +51,7 @@
 
 | 項目 | 状態 |
 |------|------|
-| バージョン | **v3.3.5** (サーバー自動再起動 + SSE Token + Gate-1 + SOT同期) — 旧: v3.3.4 |
+| バージョン | **v3.3.6** (Mission Control 6項目 UI 改善) — 旧: v3.3.5 |
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |
