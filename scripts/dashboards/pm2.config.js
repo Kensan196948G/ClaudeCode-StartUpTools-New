@@ -11,7 +11,8 @@ module.exports = {
       script: "scripts/dashboards/serve-dashboard.js",
       args: "3737",
       cwd: process.cwd(),
-      watch: false,               // ファイル変更監視は無効（安定性優先）
+      watch: ["scripts/dashboards/serve-dashboard.js"],  // JS変更時のみ再起動
+      watch_delay: 1000,
       restart_delay: 5000,        // クラッシュ後5秒で再起動
       max_restarts: 10,
       min_uptime: "10s",

@@ -9,6 +9,7 @@
   "scripts": {
     "start": "node scripts/dashboards/serve-dashboard.js",
     "start:dashboard": "node scripts/dashboards/serve-dashboard.js --port 3737",
+    "start:watch": "node scripts/dashboards/watch-and-run.js",
     "test": "pwsh -NonInteractive -Command \"$cfg=New-PesterConfiguration;$cfg.Run.Path='./tests';$cfg.Run.Exit=$false;$cfg.Output.Verbosity='Normal';Invoke-Pester -Configuration $cfg\"",
     "test:node": "node --test scripts/**/*.test.js 2>/dev/null || echo 'No Node test files found'",
     "lint": "pwsh -NonInteractive -Command \"Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error | Format-Table -AutoSize\"",

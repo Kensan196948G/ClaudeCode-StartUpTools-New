@@ -55,6 +55,31 @@ const ALLOWED_JOBS = {
   'version-drift-check':     { cmd: 'pwsh', args: ['-NonInteractive', '-Command',
     'Select-String -Path README.md,CLAUDE.md -Pattern "v\\d+\\.\\d+\\.\\d+" -AllMatches -EA SilentlyContinue | ForEach-Object { "$($_.Filename): $($_.Matches.Value -join \",\")" } | Select-Object -Unique'], timeout: 15 },
 };
+// ── SSE Token store (for EventSource auth when DASHBOARD_PASSWORD is set) ──
+// EventSource cannot send Authorization headers, so we use short-lived tokens.
+// GET /api/token → { token } (valid 5 min, requires Basic Auth)
+// GET /api/events?token=xxx → SSE stream
+const sseTokens = new Map(); // token → { expires: Date, user: string }
+const SSE_TOKEN_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function createSseToken() {
+  const token = crypto.randomBytes(16).toString('hex');
+  sseTokens.set(token, { expires: Date.now() + SSE_TOKEN_TTL_MS });
+  // Cleanup expired tokens
+  for (const [t, v] of sseTokens) {
+    if (v.expires < Date.now()) sseTokens.delete(t);
+  }
+  return token;
+}
+
+function validateSseToken(token) {
+  if (!AUTH_PASS) return true; // auth disabled
+  if (!token) return false;
+  const entry = sseTokens.get(token);
+  if (!entry || entry.expires < Date.now()) { sseTokens.delete(token); return false; }
+  return true;
+}
+
 const jobRunning = {};  // { [jobId]: true } while job is active
 const JOB_HISTORY_FILE = path.join(os.homedir(), '.claudeos', 'job-history.json');
 const JOB_HISTORY_MAX  = 50;
@@ -1357,6 +1382,16 @@ function handleCronDelete(req, res, id) {
 }
 
 function handleSSE(req, res) {
+  // When auth is enabled, require token from ?token=xxx (EventSource can't send headers)
+  if (AUTH_PASS) {
+    const urlObj  = new URL(req.url, `http://localhost`);
+    const token   = urlObj.searchParams.get('token') || '';
+    if (!validateSseToken(token)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'SSE requires valid token from GET /api/token' }));
+      return;
+    }
+  }
   res.writeHead(200, {
     'Content-Type':                'text/event-stream',
     'Cache-Control':               'no-cache',
@@ -1465,6 +1500,13 @@ if (require.main === module) {
     }
     if (req.method === 'POST' && pn === '/api/jobs') { return handleJobRun(req, res); }
     if (pn === '/api/jobs/status')                    { return handleJobStatus(res); }
+    if (pn === '/api/token' && req.method === 'GET')   {
+      // Issue short-lived SSE token (requires Basic Auth; disabled when no password)
+      const token = createSseToken();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ token, ttlMs: SSE_TOKEN_TTL_MS }));
+      return;
+    }
     if (pn === '/api/events')                         { return handleSSE(req, res); }
     if (pn === '/api/system-health')                  { return handleSystemHealth(res); }
     // Cron registry CRUD

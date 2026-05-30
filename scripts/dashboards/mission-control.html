@@ -2340,31 +2340,42 @@ const App = () => {
     forceRender(n => n + 1);
   }, [t.accentColor]);
 
-  // SSE 接続 — リアルタイムイベント受信
+  // SSE 接続 — トークン認証対応リアルタイムイベント受信
   React.useEffect(() => {
-    const es = new EventSource('/api/events');
-    es.onopen  = () => setSseConnected(true);
-    es.onerror = () => setSseConnected(false);
-    es.addEventListener('state-change', e => {
-      try {
-        const d = JSON.parse(e.data);
-        if (d.phase) setLivePhase(d.phase);
-      } catch {}
+    let es = null;
+
+    const connectSSE = (token) => {
+      const url = token ? `/api/events?token=${token}` : '/api/events';
+      es = new EventSource(url);
+      es.onopen  = () => setSseConnected(true);
+      es.onerror = () => setSseConnected(false);
+      es.addEventListener('state-change', e => {
+        try { const d = JSON.parse(e.data); if (d.phase) setLivePhase(d.phase); } catch {}
+      });
+      es.addEventListener('log-line', e => {
+        try { const d = JSON.parse(e.data); setLiveLines(prev => [...prev.slice(-199), d]); } catch {}
+      });
+      es.addEventListener('job-update', e => {
+        try {
+          const d = JSON.parse(e.data);
+          setLiveLines(prev => [...prev.slice(-199), { line: `[job] ${d.jobId}: ${d.status}${d.exitCode!=null?' exit:'+d.exitCode:''}`, at: new Date().toISOString() }]);
+        } catch {}
+      });
+      es.addEventListener('cron-change', e => {
+        try {
+          const d = JSON.parse(e.data);
+          setLiveLines(prev => [...prev.slice(-199), { line: `[cron] ${d.action}: ${d.project}`, at: new Date().toISOString() }]);
+        } catch {}
+      });
+    };
+
+    // Fetch token if auth is enabled (falls back to no-auth mode)
+    fetch('/api/token').then(r => r.json()).then(d => {
+      connectSSE(d.token);
+    }).catch(() => {
+      connectSSE(null); // no auth mode
     });
-    es.addEventListener('log-line', e => {
-      try {
-        const d = JSON.parse(e.data);
-        setLiveLines(prev => [...prev.slice(-199), d]);
-      } catch {}
-    });
-    es.addEventListener('job-update', e => {
-      try {
-        // job-update は JobsPanel の 3秒ポーリングが拾うため状態更新はスキップ
-        const d = JSON.parse(e.data);
-        setLiveLines(prev => [...prev.slice(-199), { line: `[job] ${d.jobId}: ${d.status}${d.exitCode!=null?' exit:'+d.exitCode:''}`, at: new Date().toISOString() }]);
-      } catch {}
-    });
-    return () => es.close();
+    return () => { if (es) es.close(); };
   }, []);
 
   // 単一の 30秒ポーリング — 全パネルに liveData を供給
