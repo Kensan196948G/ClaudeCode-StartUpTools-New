@@ -101,7 +101,8 @@
 92. [DONE] [Priority:P2][Owner:QA][Source:Manual] v3.3.3 Playwright E2E 全9パネル検証 + STABLE実API化(2/3amber→3/3green)
 93. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.4 Cron CRUD API + WebUI 登録フォーム — GET/POST/DELETE /api/cron / CronRegisterModal / 削除確認ダイアログ / E2E検証済み
 94. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.5 サーバー自動再起動+SSE Token認証+Gate-1 13項目+SOT 93ファイル同期+パフォーマンス改善
-95. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.6 WebUI 完全 250項目チェックリスト Gate-2/3 + PR作成 + Codex review
+95. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.6 Mission Control 6項目 UI 改善 — Projects Cron専用/Dashboard稼働バナー/健全性全プロジェクト/CI選択/Cron日時フォーマット
+96. [NEXT] [Priority:P2][Owner:Developer][Source:Manual] v3.3.7 PR作成 + CodeRabbit review + WebUI 250項目 Gate-2 実施
 
 ## Auto Extracted From Agent Teams Matrix
 
