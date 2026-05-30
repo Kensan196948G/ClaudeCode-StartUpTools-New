@@ -524,6 +524,34 @@ flowchart LR
 | `linuxHost` | SSH 接続先 |
 | `linuxBase` | Linux 側のプロジェクトルート |
 | `tools.defaultTool` | `Start-All.ps1` のデフォルトツール |
+| `dashboardAuth.password` | Mission Control Basic Auth パスワード（任意） |
+| `dashboardAuth.user` | Mission Control ユーザー名（省略時 `admin`） |
+
+### 🔐 Mission Control WebUI アクセス制御
+
+```powershell
+# ローカルアクセスのみ（認証なし — デフォルト）
+npm start
+
+# LAN 公開 + Basic Auth 有効化（推奨）
+$env:DASHBOARD_PASSWORD = "your-secret-password"
+$env:DASHBOARD_USER = "admin"   # 省略時は admin
+npm start
+# → http://192.168.0.143:3737 にアクセスするとパスワード入力を求められる
+```
+
+または `config/config.json` に永続設定:
+```json
+{
+  "dashboardAuth": {
+    "user": "admin",
+    "password": "your-secret-password"
+  }
+}
+```
+
+> ⚠️ `/api/health` は認証を常にバイパスします（監視ツールのプローブ用）。  
+> `/api/events`（SSE）はブラウザが Basic Auth を自動送信するため個別対応不要。
 
 ---
 
