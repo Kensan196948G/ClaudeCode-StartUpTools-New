@@ -1152,12 +1152,16 @@ function handleJobStatus(res) {
 }
 
 // ── System Health ─────────────────────────────────────────────────────────
+const SKIP_DIRS = new Set(['node_modules', '.git', '__pycache__', '.venv', 'dist', 'build']);
+
 function countFiles(dir) {
   let n = 0;
   function walk(d) {
     if (!fs.existsSync(d)) return;
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      e.isDirectory() ? walk(path.join(d, e.name)) : n++;
+      if (e.isDirectory()) {
+        if (!SKIP_DIRS.has(e.name)) walk(path.join(d, e.name));
+      } else { n++; }
     }
   }
   try { walk(dir); } catch {}
