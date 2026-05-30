@@ -505,7 +505,7 @@ function SideNav({ active, onChange }) {
       })}
       <div style={{ marginTop:"auto", padding:16, borderTop:`1px solid ${MC.border}` }}>
         <div style={{ fontSize:10, color:MC.textMuted, fontFamily:MC.mono, lineHeight:1.6 }}>
-          <div>v3.3.2</div>
+          <div>v3.3.3</div>
           <div>テスト: 800件</div>
           <div>エージェント: 28体</div>
           <div>フック: 4個</div>
@@ -1473,7 +1473,7 @@ const CICDPanel = ({ liveData }) => {
         <Panel title="CI サマリー" icon="📊">
           <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
             <div style={{ display:"flex", justifyContent:"center" }}><Gauge value={96} max={100} size={100} strokeWidth={8} color={MC.green} label="CI 成功率" /></div>
-            {[["テスト件数","800",MC.green],["PSScriptAnalyzer","11 警告",MC.amber],["gitleaks","0 漏洩",MC.green],["Unit","21 files",MC.textDim],["Integration","11 files",MC.textDim]].map(([l,v,c]) => (
+            {[["テスト件数","800",MC.green],["PSScriptAnalyzer","0 警告",MC.green],["gitleaks","0 漏洩",MC.green],["Unit","21 files",MC.textDim],["Integration","11 files",MC.textDim]].map(([l,v,c]) => (
               <div key={l} style={{ display:"flex", justifyContent:"space-between", fontSize:11 }}><span style={{ color:MC.textMuted }}>{l}</span><span style={{ fontFamily:MC.mono, color:c, fontWeight:500 }}>{v}</span></div>
             ))}
           </div>
