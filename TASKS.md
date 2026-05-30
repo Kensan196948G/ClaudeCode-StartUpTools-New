@@ -95,6 +95,8 @@
 86. [DONE] [Priority:P2][Owner:Architect][Source:Manual] v3.2.76 P1-3 登録プロジェクトレジストリ集中管理 — CronManager.psm1 に Get/Add/Remove-LocalCronRegistryEntry 追加。~/.claudeos/cron-registry.json を cron 登録/削除時に自動更新。ユニットテスト 6件 (776 PASS)
 87. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.2.76 P1-7 Agent Teams 使用実績を state.json に記録 — usage-tracker.js 新規作成 / settings.json PostToolUse[Agent] hook 登録。learning.usage_history.agents に agentKey / call_count / last_used を記録 (776 PASS)
 88. [DONE] [Priority:P2][Owner:Developer][Source:Manual] v3.3.1 Mission Control ダッシュボード全面改善 — Cron管理週間スケジュール全幅レイアウト / 正式名称2行表示 / Boot Sequenceアクティブセッションパネル / イベントログ日本語化 / /goal MVP RC テンプレート刷新 (PR #このブランチ)
+89. [DONE] [Priority:P1][Owner:Developer][Source:Manual] v3.3.2 WebUI Basic Auth + package.json + .claude/skills + PSScriptAnalyzer 28→11 — HTTP Basic Auth / ジョブ履歴永続化 / SOT ドリフト修正 / BOM 15ファイル / empty catch 6件 / 関数名タイポ / Dependabot #289 merge
+90. [NEXT] [Priority:P3][Owner:Developer][Source:GitHub#301] v3.3.3 PSScriptAnalyzer 残余 11 件解消 — PSReviewUnusedParameter(5) + PSAvoidUsingEmptyCatchBlock(2) + PSUseSingularNouns(2) + PSAvoidOverwritingBuiltInCmdlets(1) + PSUseShouldProcessForStateChangingFunctions(1)
 
 ## Auto Extracted From Agent Teams Matrix
 
