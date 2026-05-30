@@ -52,7 +52,7 @@
 | テスト | **776件** — Pester (Unit 21 / Integration 11 / Smoke 1) |
 | CI | ✅ SUCCESS |
 | ClaudeOS (Claude Code 専用) | **v9.0** (`/goal` 駆動 / Agent Teams パターン A/B/C / Agent View / 動的判断 / 週次フェーズ制御 / learning パターン記録 / Stop Conditions 厳格化 / Opus 4.7 最適化 / 1H cache / PreCompact hook) |
-| Agents | **28体** の特化サブエージェント (2026Q2 棚卸し後、追加復元済み) |
+| Agents | **44体** の特化サブエージェント (v3.3.5 SOT同期でテンプレートから16体追加) |
 | Skills | **2個** — `cto-session-start`（CTO 全権委任セッション起動）/ `webui-health-check`（WebUI 健全性確認） |
 | Hooks | **4個** — agent-risk-check / capture-result / onboarding-refresh / usage-history-recorder |
 | Boot Sequence | `Start-ClaudeOS.ps1` (Step 3 Memory/Step 5 Executive Init/Step 6 Management Init/Step 7 Agent Init/Step 8 Loop Engine Start/Step 9 Dashboard 実装完了) ✅ |
@@ -77,7 +77,7 @@
 
 ### ClaudeOS エージェント構成 (2026Q2 棚卸し後)
 
-> 2026Q2 棚卸し (PR #122) 後、ドメイン固有知識エージェントを追加復元。現在 **28体**。
+> 2026Q2 棚卸し (PR #122) 後、ドメイン固有知識エージェントを追加復元。v3.3.5 SOT同期で現在 **44体**。
 
 | ドメイン | Agent数 | 主なエージェント |
 |----------|---------|-----------------|
@@ -295,7 +295,7 @@ flowchart TD
 | 🩺 診断ツール | 🔧 共通 | `Test-AllTools.ps1` で環境を一括チェック |
 | ⚡ CI/CD | 🔧 共通 | GitHub Actions による自動テスト (Pester 800件) |
 | 🌐 Mission Control WebUI | ⭐ Claude 専用 | `http://localhost:3737/mission-control` — SSE リアルタイム / 固定ジョブ実行 / システム健全性パネル / Basic Auth 対応 🆕 |
-| 🧠 ClaudeOS カーネル | ⭐ Claude 専用 | 28体のエージェント + 4フック + 34コマンド |
+| 🧠 ClaudeOS カーネル | ⭐ Claude 専用 | 44体のエージェント + 4フック + 42コマンド |
 | 🔌 MCP ヘルスチェック | ⭐ Claude 専用 | `McpHealthCheck.psm1` で4サーバーの起動・接続・状態診断 |
 | 🤖 Agent Teams ランタイム | ⭐ Claude 専用 | `AgentTeams.psm1` でタスク分析→Team自動構成→能力マトリクス→可視化 |
 | 🏁 Pre-Launch Diagnostics | ⭐ Claude 専用 | Claude Code 起動前に MCP/Agent 状態を自動チェック |
