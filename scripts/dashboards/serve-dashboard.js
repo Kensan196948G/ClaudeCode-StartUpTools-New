@@ -14,6 +14,7 @@ const http    = require('http');
 const fs      = require('fs');
 const path    = require('path');
 const os      = require('os');
+const crypto  = require('crypto');
 const { exec, execSync, spawn } = require('child_process');
 const { promisify } = require('util');
 const execAsync     = promisify(exec);
@@ -121,13 +122,25 @@ try {
   }
 } catch { /* 読み取り失敗は無視 */ }
 
+/** Timing-safe string comparison using crypto.timingSafeEqual (prevents timing attacks). */
+function safeStrEqual(a, b) {
+  const ab = Buffer.from(String(a)), bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) {
+    crypto.timingSafeEqual(ab, ab); // dummy call: normalize timing
+    return false;
+  }
+  return crypto.timingSafeEqual(ab, bb);
+}
+
 /** HTTP Basic Auth check — returns true if authorized (or auth disabled).
  *  Call this at the TOP of each request handler; on failure it writes 401 and returns false.
  *  /api/health is always exempt so monitoring probes are never blocked.
+ *  Uses crypto.timingSafeEqual to prevent timing-based password enumeration.
  */
 function checkBasicAuth(req, res) {
   if (!AUTH_PASS) return true;                       // auth disabled
-  if (req.url === '/api/health' || req.url === '/health') return true; // always public
+  const pathname = req.url.split('?')[0];            // strip query string for matching
+  if (pathname === '/api/health' || pathname === '/health') return true; // always public
   const header = req.headers['authorization'] || '';
   if (header.startsWith('Basic ')) {
     const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
@@ -135,7 +148,7 @@ function checkBasicAuth(req, res) {
     if (colon !== -1) {
       const user = decoded.slice(0, colon);
       const pass = decoded.slice(colon + 1);
-      if (user === AUTH_USER && pass === AUTH_PASS) return true;
+      if (safeStrEqual(user, AUTH_USER) && safeStrEqual(pass, AUTH_PASS)) return true;
     }
   }
   res.writeHead(401, {
@@ -1102,7 +1115,7 @@ function handleJobRun(req, res) {
     const startAt = new Date().toISOString();
     const entry = { jobId, startAt, status: 'running', endAt: null, exitCode: null, output: '' };
     jobHistory.push(entry);
-    if (jobHistory.length > 20) jobHistory.shift();
+    if (jobHistory.length > JOB_HISTORY_MAX) jobHistory.shift();
     pushEvent('job-update', { jobId, status: 'running', startAt });
 
     const child = spawn(job.cmd, job.args, { cwd: PROJ_ROOT, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -1305,15 +1318,18 @@ if (require.main === module) {
     // Basic Auth guard (skips /api/health; disabled when DASHBOARD_PASSWORD is unset)
     if (!checkBasicAuth(req, res)) return;
 
-    if (req.url === '/health' || req.url === '/api/health') {
+    // Strip query string for route matching (prevents ?bypass injection)
+    const pn = req.url.split('?')[0];
+
+    if (pn === '/health' || pn === '/api/health') {
       const ts = readTrustScore();
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ status: 'ok', uptime: Math.floor(process.uptime()), trust: ts, at: new Date().toISOString() }));
       return;
     }
-    if (req.url === '/api/data')           return handleApiData(res);
-    if (req.url === '/api/mc-data')        { handleMcData(res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} }); return; }
-    if (req.url === '/api/agent-teams') {
+    if (pn === '/api/data')           return handleApiData(res);
+    if (pn === '/api/mc-data')        { handleMcData(res).catch(e => { try { res.writeHead(500); res.end(e.message); } catch {} }); return; }
+    if (pn === '/api/agent-teams') {
       try {
         const data = getAgentTeamsActivity();
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
@@ -1324,11 +1340,11 @@ if (require.main === module) {
       }
       return;
     }
-    if (req.method === 'POST' && req.url === '/api/jobs') { return handleJobRun(req, res); }
-    if (req.url === '/api/jobs/status')                    { return handleJobStatus(res); }
-    if (req.url === '/api/events')                         { return handleSSE(req, res); }
-    if (req.url === '/api/system-health')                  { return handleSystemHealth(res); }
-    if (req.url === '/mission-control' || req.url === '/mc') return handleMissionControl(res);
+    if (req.method === 'POST' && pn === '/api/jobs') { return handleJobRun(req, res); }
+    if (pn === '/api/jobs/status')                    { return handleJobStatus(res); }
+    if (pn === '/api/events')                         { return handleSSE(req, res); }
+    if (pn === '/api/system-health')                  { return handleSystemHealth(res); }
+    if (pn === '/mission-control' || pn === '/mc') return handleMissionControl(res);
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(buildHtml());
   });
