@@ -242,7 +242,7 @@ function Show-Menu {
     if ($isDevelopment) {
         Write-Host "  🚢 " -NoNewline -ForegroundColor Blue
         Write-Host "デプロイ管理" -ForegroundColor DarkBlue
-        Write-Host "   " -NoNewline; Write-Host "  D " -NoNewline -ForegroundColor Black -BackgroundColor Blue
+        Write-Host "   " -NoNewline; Write-Host "  DP" -NoNewline -ForegroundColor Black -BackgroundColor Blue
         Write-Host "  🚀 デプロイ準備（Runbook生成・前提チェック）" -ForegroundColor Blue
         Write-Host "   " -NoNewline; Write-Host "  M " -NoNewline -ForegroundColor Black -BackgroundColor DarkCyan
         Write-Host "  🔄 保守モードへ移行（リリース完了後）" -ForegroundColor DarkCyan
@@ -274,7 +274,7 @@ function Show-Menu {
         "12  📊 Statusline 設定",
         "13  📡 Claude ログ監視タブを開く",
         "16  🤝 Agent Teams Status (CLI 表示)",
-        "D   🌐 Projects Dashboard (進捗 WebUI)",
+        "PD  🌐 Projects Dashboard (進捗 WebUI)",
         "MC  🎛️  Mission Control (統合管理 / Agent Teams 計測)",
         "DR  📌 Dashboard をタスクスケジューラーに登録（自動起動）",
         "DU  🗑️  Dashboard タスクを解除"
@@ -361,7 +361,7 @@ while ($true) {
     switch ($choice.ToUpper()) {
         "S1" { Invoke-ToolFromMenu -Tool "claude" }
         "L1" { Invoke-ToolFromMenu -Tool "claude" -Local }
-        "D"  { Invoke-MenuScript -File "scripts\main\Start-DeployPrep.ps1" }
+        "DP" { Invoke-MenuScript -File "scripts\main\Start-DeployPrep.ps1" }
         "M"  {
             Write-Host ""
             Write-Host "  保守モードへ移行します。" -ForegroundColor Cyan
@@ -413,7 +413,7 @@ while ($true) {
             Read-Host "  Enterキーでメニューに戻ります"
         }
         "14" { Invoke-MenuScript -File "scripts\main\New-CronSchedule.ps1" }
-        "D"  { Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" }
+        "PD" { Invoke-MenuScript -File "scripts\main\Start-Dashboard.ps1" }
         "MC" {
             $env:AI_STARTUP_PROJECTS_DIR = $Config.projectsDir
             Start-Process "http://localhost:3737/mission-control"

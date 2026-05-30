@@ -1050,11 +1050,19 @@ window.AgentsPanel = AgentsPanel;
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
 const JOB_META = {
-  'audit-scan':         { label: 'Audit Scan',         icon: '🗄️', desc: '変更証跡収集' },
-  'cmdb-scan':          { label: 'CMDB Scan',          icon: '📊', desc: '構成アイテム差分' },
-  'sync-issues':        { label: 'Sync Issues',        icon: '🔄', desc: 'GitHub Issues 同期' },
-  'agent-teams-status': { label: 'Agent Teams Status', icon: '🤖', desc: 'Agent Teams 状態確認' },
-  'gitleaks-run':       { label: 'Gitleaks Scan',      icon: '🔐', desc: 'シークレット検出' },
+  // ── 既存ジョブ ──────────────────────────────────────────────────────────
+  'audit-scan':           { label: 'Audit Scan',           icon: '🗄️', desc: '変更証跡収集' },
+  'cmdb-scan':            { label: 'CMDB Scan',            icon: '📊', desc: '構成アイテム差分' },
+  'sync-issues':          { label: 'Sync Issues',          icon: '🔄', desc: 'GitHub Issues 同期' },
+  'agent-teams-status':   { label: 'Agent Teams Status',   icon: '🤖', desc: 'Agent Teams 状態確認' },
+  'gitleaks-run':         { label: 'Gitleaks Scan',        icon: '🔐', desc: 'シークレット検出' },
+  // ── 診断系ジョブ ────────────────────────────────────────────────────────
+  'mcp-health':           { label: 'MCP Health Check',     icon: '🩹', desc: 'MCP サーバー疎通確認' },
+  'architecture-check':   { label: 'Architecture Check',   icon: '🏛️', desc: '設計規約違反検出' },
+  'worktree-list':        { label: 'Worktree List',        icon: '🌿', desc: 'Worktree 一覧確認' },
+  'test-all-tools':       { label: 'Test All Tools',       icon: '🩺', desc: '全ツール動作確認' },
+  'pester-run':           { label: 'Pester Tests',         icon: '🧪', desc: 'PowerShell テスト実行' },
+  'psscriptanalyzer-run': { label: 'PSScriptAnalyzer',     icon: '🔍', desc: 'PS スクリプト静的解析' },
 };
 
 function JobsPanel() {
@@ -1421,10 +1429,16 @@ const CronPanel = ({ liveData }) => {
 
         {/* ── Schedule table ── */}
         <Panel title="Cronスケジュール一覧" icon="🕐" headerRight={
-          <button onClick={() => setShowAdd(!showAdd)} style={{
-            padding:"4px 12px", borderRadius:4, border:`1px solid ${MC.accent}`,
-            background:MC.accent+"18", color:MC.accent, fontSize:11, fontWeight:600, cursor:"pointer",
-          }}>＋ 新規登録</button>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <span style={{ fontSize:10, color:MC.amber, fontFamily:MC.mono, border:`1px solid ${MC.amber}44`, borderRadius:3, padding:"2px 7px" }}>
+              👁 表示専用 — 変更はCLI [14]
+            </span>
+            <button onClick={() => setShowAdd(!showAdd)} style={{
+              padding:"4px 12px", borderRadius:4, border:`1px solid ${MC.border}`,
+              background:"transparent", color:MC.textMuted, fontSize:11, fontWeight:600,
+              cursor:"not-allowed", opacity:0.4,
+            }} title="Cron登録はCLIメニュー [14] を使用してください" disabled>＋ 新規登録</button>
+          </div>
         } noPad>
           <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
             <thead>
@@ -1466,10 +1480,15 @@ const CronPanel = ({ liveData }) => {
                     }
                   </td>
                   <td style={{ padding:"8px 10px" }}>
-                    <button onClick={() => togglePause(i)} style={{
-                      padding:"3px 8px", borderRadius:3, border:`1px solid ${MC.border}`,
-                      background:"transparent", color:MC.textDim, fontSize:10, cursor:"pointer", whiteSpace:"nowrap",
-                    }}>{s.status==="active" ? "⏸ 停止" : "▶ 再開"}</button>
+                    <span
+                      title="表示専用 — 実crontabへの反映はCLIメニュー [14] を使用してください"
+                      style={{
+                        display:"inline-block", padding:"3px 8px", borderRadius:3,
+                        border:`1px solid ${MC.border}`, background:"transparent",
+                        color:MC.textMuted, fontSize:10, cursor:"not-allowed",
+                        whiteSpace:"nowrap", opacity:0.45, userSelect:"none",
+                      }}
+                    >{s.status==="active" ? "⏸ 停止" : "▶ 再開"}</span>
                   </td>
                 </tr>
               ))}

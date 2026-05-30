@@ -25,11 +25,23 @@ const PROJ_ROOT    = path.resolve(__dirname, '..', '..');
 
 // ── Fixed Job execution (POST /api/jobs) ────────────────────────────────────
 const ALLOWED_JOBS = {
-  'audit-scan':         { cmd: 'node',     args: ['scripts/tools/run-audit-scan.js'],                           timeout: 30 },
-  'cmdb-scan':          { cmd: 'node',     args: ['scripts/tools/run-cmdb-scan.js'],                            timeout: 20 },
-  'sync-issues':        { cmd: 'pwsh',     args: ['-NonInteractive', '-File', 'scripts/tools/Sync-Issues.ps1'], timeout: 30 },
-  'agent-teams-status': { cmd: 'node',     args: ['scripts/tools/agent-teams-status.js'],                       timeout: 10 },
-  'gitleaks-run':       { cmd: 'gitleaks', args: ['detect', '--source', '.', '--exit-code', '0'],               timeout: 30 },
+  // ── 既存ジョブ ──────────────────────────────────────────────────────────
+  'audit-scan':         { cmd: 'node',  args: ['scripts/tools/run-audit-scan.js'],                             timeout: 30 },
+  'cmdb-scan':          { cmd: 'node',  args: ['scripts/tools/run-cmdb-scan.js'],                              timeout: 20 },
+  'sync-issues':        { cmd: 'pwsh',  args: ['-NonInteractive', '-File', 'scripts/tools/Sync-Issues.ps1'],   timeout: 30 },
+  'agent-teams-status': { cmd: 'node',  args: ['scripts/tools/agent-teams-status.js'],                         timeout: 10 },
+  'gitleaks-run':       { cmd: 'gitleaks', args: ['detect', '--source', '.', '--exit-code', '0'],              timeout: 30 },
+  // ── 診断系ジョブ（評価 §16 対応）────────────────────────────────────────
+  'mcp-health':         { cmd: 'pwsh',  args: ['-NonInteractive', '-File', 'scripts/test/Test-McpHealth.ps1'],           timeout: 30 },
+  'architecture-check': { cmd: 'pwsh',  args: ['-NonInteractive', '-File', 'scripts/test/Test-ArchitectureCheck.ps1'],   timeout: 30 },
+  'worktree-list':      { cmd: 'pwsh',  args: ['-NonInteractive', '-File', 'scripts/test/Test-WorktreeManager.ps1'],     timeout: 20 },
+  'test-all-tools':     { cmd: 'pwsh',  args: ['-NonInteractive', '-File', 'scripts/test/Test-AllTools.ps1'],            timeout: 60 },
+  'pester-run':         { cmd: 'pwsh',  args: ['-NonInteractive', '-Command',
+    '$cfg=New-PesterConfiguration;$cfg.Run.Path="./tests";$cfg.Run.Exit=$false;$cfg.Output.Verbosity="Normal";Invoke-Pester -Configuration $cfg'],
+    timeout: 120 },
+  'psscriptanalyzer-run': { cmd: 'pwsh', args: ['-NonInteractive', '-Command',
+    'Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error,Warning | Select-Object ScriptName,Line,Severity,RuleName,Message | Format-Table -AutoSize | Out-String -Width 200'],
+    timeout: 60 },
 };
 const jobRunning = {};  // { [jobId]: true } while job is active
 const jobHistory = [];  // ring buffer – last 20 runs
