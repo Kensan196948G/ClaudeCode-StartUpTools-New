@@ -1210,7 +1210,18 @@ function countFiles(dir) {
   return n;
 }
 
+// Cache system health to avoid repeated slow powershell calls
+let _healthCache = null;
+let _healthCacheAt = 0;
+const HEALTH_CACHE_TTL = 15000; // 15 seconds
+
 function handleSystemHealth(res) {
+  // Return cached response if fresh
+  if (_healthCache && (Date.now() - _healthCacheAt) < HEALTH_CACHE_TTL) {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.end(_healthCache);
+    return;
+  }
   const c = {};
   // package.json
   c.packageJsonMissing  = !fs.existsSync(path.join(PROJ_ROOT, 'package.json'));
@@ -1237,11 +1248,11 @@ function handleSystemHealth(res) {
     c.deployedFilesCount  = dep;
     c.sourceOfTruthDiff   = Math.abs(tpl - dep);
   } catch { c.sourceOfTruthDiff = -1; }
-  // Dashboard Task status (Windows only)
+  // Dashboard Task status (Windows only) — short timeout to avoid blocking
   try {
     const out = execSync(
       'powershell -NonInteractive -Command "(Get-ScheduledTask -TaskName \'ClaudeOS Dashboard\' -ErrorAction SilentlyContinue).State"',
-      { encoding: 'utf8', timeout: 5000 }
+      { encoding: 'utf8', timeout: 1500 }  // reduced from 5000ms to 1500ms
     );
     c.dashboardTaskState = out.trim() || 'NotRegistered';
   } catch { c.dashboardTaskState = 'Unknown'; }
@@ -1256,10 +1267,14 @@ function handleSystemHealth(res) {
 
   // Server process info
   c.serverUptimeSec = Math.floor(process.uptime());
-  c.serverVersion   = '3.3.4';  // Update on each release
+  c.serverVersion   = '3.3.5';  // Update on each release
+
+  const body = JSON.stringify({ checks: c, generated: new Date().toISOString() }, null, 2);
+  _healthCache   = body;
+  _healthCacheAt = Date.now();
 
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
-  res.end(JSON.stringify({ checks: c, generated: new Date().toISOString() }, null, 2));
+  res.end(body);
 }
 
 // ── Cron Registry CRUD ────────────────────────────────────────────────────
