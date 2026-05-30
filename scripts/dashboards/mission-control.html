@@ -1275,9 +1275,9 @@ window.ConfirmModal = ConfirmModal;
 
 // ── SystemHealthPanel（システム健全性）───────────────────────────────────
 const HEALTH_ITEMS = [
-  { key:'packageJsonMissing',   label:'package.json',          warn: v => v,     icon:'📦', warnMsg:'未存在（package-lock.json のみ）', okMsg:'存在' },
-  { key:'claudeSkillsMissing',  label:'.claude/skills/',       warn: v => v,     icon:'🎯', warnMsg:'未存在（公式 2.1.157 未追随）', okMsg:'存在' },
-  { key:'authEnabled',          label:'認証 (Auth)',           warn: v => !v,    icon:'🔐', warnMsg:'未実装（LAN公開中）', okMsg:'有効' },
+  { key:'packageJsonMissing',   label:'package.json',          warn: v => v,     icon:'📦', warnMsg:'未存在（npm install 不可）', okMsg:'存在 ✅' },
+  { key:'claudeSkillsMissing',  label:'.claude/skills/',       warn: v => v,     icon:'🎯', warnMsg:'未存在（Claude Code 2.1.157 未追随）', okMsg:'存在 ✅' },
+  { key:'authEnabled',          label:'認証 (Auth)',           warn: v => !v,    icon:'🔐', warnMsg:'無効（set DASHBOARD_PASSWORD=*** で有効化）', okMsg:'Basic Auth 有効' },
   { key:'corsEnabled',          label:'CORS',                  warn: v => v,     icon:'🌐', warnMsg:'全許可（* 設定）', okMsg:'無効' },
   { key:'jobHistoryPersisted',  label:'ジョブ履歴永続化',       warn: v => !v,    icon:'💾', warnMsg:'メモリのみ（再起動で消失）', okMsg:'ファイル永続化済み' },
   { key:'untrackedFilesCount',  label:'未追跡ファイル',         warn: v => v > 0, icon:'📁', warnMsg: v => `${v} 件`, okMsg:'0 件' },
