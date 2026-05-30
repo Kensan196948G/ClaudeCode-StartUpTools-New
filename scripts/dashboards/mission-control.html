@@ -185,7 +185,7 @@ const MOCK_STATE = {
   project: { name: "ClaudeCode-StartUpTools-New", registration_date: "2026-01-15", release_deadline: null, phase_mode: "development", cron_enabled: true, session_max_minutes: 300, version: "v3.3.2" },
   kpi: { success_rate_target: 0.9, ci_success_rate: 0.96, test_pass_rate: 1.0, security_critical: 0, blocker_count: 0 },
   execution: { start_time: new Date(Date.now() - 142*60000).toISOString(), max_duration_minutes: 300, elapsed_minutes: 142, remaining_minutes: 158, phase: "Development", last_stop_at: new Date(Date.now() - 86400000).toISOString(), current_session_prs: ["#241","#242"], current_session_last_pr: "#242" },
-  stable: { consecutive_success: 2, target_n: 3, last_verified_at: new Date(Date.now() - 3600000).toISOString(), stable_achieved: false },
+  stable: { consecutive_success: 3, target_n: 3, last_verified_at: new Date(Date.now() - 3600000).toISOString(), stable_achieved: true },
   token: { total_budget: 100, used: 38, remaining: 62, allocation: { monitor: 10, development: 35, verify: 25, improvement: 15, debug: 10, release: 5 }, current_phase_budget: 35, current_phase_used: 14 },
   automation: { auto_issue_generation: true, self_evolution: true },
   learning: { usage_history: { agents: { "security-reviewer": { call_count: 12 }, "e2e-runner": { call_count: 8 }, "tester": { call_count: 15 } } } },
@@ -1487,7 +1487,13 @@ const CICDPanel = ({ liveData }) => {
               </div>
             ))}
             <div style={{ borderTop:`1px solid ${MC.border}`, paddingTop:8, marginTop:4, textAlign:"center" }}>
-              <span style={{ fontSize:13, fontWeight:700, fontFamily:MC.mono, color:MC.amber }}>STABLE {window.MOCK_STATE.stable.consecutive_success}/{window.MOCK_STATE.stable.target_n}</span>
+              {(() => {
+                const st = liveData?.currentProjectInfo?.stable || window.MOCK_STATE.stable;
+                const cons = st.consecutive ?? st.consecutive_success ?? 0;
+                const tgt  = st.targetN     ?? st.target_n            ?? 3;
+                const ok   = st.achieved    ?? st.stable_achieved     ?? false;
+                return <span style={{ fontSize:13, fontWeight:700, fontFamily:MC.mono, color: ok ? MC.green : MC.amber }}>STABLE {cons}/{tgt}</span>;
+              })()}
             </div>
           </div>
         </Panel>

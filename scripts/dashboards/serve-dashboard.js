@@ -842,11 +842,14 @@ function getCurrentProjectInfo() {
     todayCommitList = raw ? raw.split('\n').filter(Boolean) : [];
     todayCommits = todayCommitList.length;
   } catch {}
-  let goal = '—', phase = '—';
+  let goal = '—', phase = '—', stableConsecutive = 0, stableTargetN = 3, stableAchieved = false;
   try {
     const st = JSON.parse(fs.readFileSync(path.join(PROJ_ROOT, 'state.json'), 'utf8'));
-    goal  = st?.goal?.title || (typeof st?.goal === 'string' ? st.goal : null) || '—';
-    phase = st?.phase || '—';
+    goal              = st?.goal?.title || (typeof st?.goal === 'string' ? st.goal : null) || '—';
+    phase             = st?.execution?.phase || st?.phase || '—';
+    stableConsecutive = st?.stable?.consecutive_success || 0;
+    stableTargetN     = st?.stable?.target_n             || 3;
+    stableAchieved    = st?.stable?.stable_achieved      || false;
   } catch {}
 
   // Trust Score: readTrustScore() 共通ヘルパーを使用
@@ -872,6 +875,7 @@ function getCurrentProjectInfo() {
     projectName, branch, todayCommits,
     todayCommitList: todayCommitList.slice(0, 5),
     goal, phase,
+    stable: { consecutive: stableConsecutive, targetN: stableTargetN, achieved: stableAchieved },
     activeCron,
     trust,
     checkedAt: new Date().toISOString(),
