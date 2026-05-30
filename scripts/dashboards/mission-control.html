@@ -1507,28 +1507,62 @@ window.SystemHealthPanel = SystemHealthPanel;
        BLOCK 6: CI/CD & GitHub Panel
   ═══════════════════════════════════════════════════ -->
   <script type="text/babel">
+// Build github-registry lookup: projectName → fullRepo (owner/repo)
+const GITHUB_REGISTRY_LOOKUP = window.GITHUB_REGISTRY || {};
+
 const CICDPanel = ({ liveData, projData }) => {
-  const [selProj, setSelProj] = React.useState("__ALL__");
+  const [selProj,    setSelProj]    = React.useState("__ALL__");
+  const [projCiData, setProjCiData] = React.useState(null);   // per-project CI data
+  const [projCiLoading, setProjCiLoading] = React.useState(false);
+  const [projCiError, setProjCiError] = React.useState('');
+
   const cronProjects = (projData?.projects || []).filter(p => p.hasCron);
-  // Filter workflows by selected project name (partial match on workflowName or commitMsg)
-  const workflows = (liveData?.ciWorkflows?.length ? liveData.ciWorkflows : null) || window.CI_WORKFLOWS;
-  const prs       = (liveData?.recentPRs?.length   ? liveData.recentPRs   : null) || window.RECENT_PRS;
-  const issues    = (liveData?.openIssues?.length   ? liveData.openIssues  : null) || window.OPEN_ISSUES;
+
+  // Fetch per-project CI when a project is selected
+  React.useEffect(() => {
+    if (selProj === "__ALL__") { setProjCiData(null); return; }
+    // Find the github URL for this project
+    const proj = (projData?.projects || []).find(p => p.name === selProj);
+    const ghUrl = proj?.githubUrl || GITHUB_REGISTRY_LOOKUP[selProj]?.url || '';
+    const repoMatch = ghUrl.match(/github\.com\/([A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+)/);
+    if (!repoMatch) { setProjCiError(`GitHub URL が不明です: ${selProj}`); return; }
+    const repoFullName = repoMatch[1];
+    setProjCiLoading(true); setProjCiError('');
+    fetch(`/api/project-ci?repo=${encodeURIComponent(repoFullName)}`)
+      .then(r => r.json())
+      .then(d => { setProjCiData(d); setProjCiLoading(false); })
+      .catch(e => { setProjCiError(String(e)); setProjCiLoading(false); });
+  }, [selProj]);
+
+  // Decide data source: selected project OR default (this repo)
+  const workflows = selProj !== "__ALL__"
+    ? (projCiData?.ciWorkflows || [])
+    : (liveData?.ciWorkflows?.length ? liveData.ciWorkflows : null) || window.CI_WORKFLOWS;
+  const prs       = selProj !== "__ALL__"
+    ? (projCiData?.recentPRs  || [])
+    : (liveData?.recentPRs?.length   ? liveData.recentPRs   : null) || window.RECENT_PRS;
+  const issues    = selProj !== "__ALL__"
+    ? (projCiData?.openIssues || [])
+    : (liveData?.openIssues?.length   ? liveData.openIssues  : null) || window.OPEN_ISSUES;
   const [tab, setTab] = React.useState("workflows");
   return (
     <div style={{ display:"grid", gridTemplateColumns:"1fr 340px", gap:12, height:"100%" }}>
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
 
         {/* ── プロジェクト選択 ── */}
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
           <span style={{ fontSize:11, color:MC.textMuted }}>プロジェクト:</span>
           <select value={selProj} onChange={e => setSelProj(e.target.value)}
             style={{ background:MC.bgPanel, border:`1px solid ${MC.border}`, borderRadius:4, color:MC.text, fontSize:11, padding:"4px 8px", cursor:"pointer" }}>
             <option value="__ALL__">このリポジトリ (管理ツール)</option>
-            {cronProjects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+            {cronProjects.filter(p => p.githubUrl).map(p => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
           </select>
-          {selProj !== "__ALL__" && (
-            <span style={{ fontSize:10, color:MC.amber }}>⚠️ 他プロジェクトのCI表示は未実装（GitHub API 拡張必要）</span>
+          {projCiLoading && <span style={{ fontSize:11, color:MC.amber }}>⏳ 読み込み中...</span>}
+          {projCiError && <span style={{ fontSize:10, color:MC.red }}>❌ {projCiError}</span>}
+          {selProj !== "__ALL__" && !projCiLoading && !projCiError && projCiData && (
+            <span style={{ fontSize:10, color:MC.green }}>✅ {projCiData.repo}</span>
           )}
         </div>
 
@@ -1573,16 +1607,33 @@ const CICDPanel = ({ liveData, projData }) => {
         {tab === "prs" && (
           <Panel title="Pull Requests" icon="🔀" noPad>
             <div style={{ display:"flex", flexDirection:"column" }}>
-              {prs.map(pr => (
-                <div key={pr.number} style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:`1px solid ${MC.border}08` }}>
-                  <span style={{ fontSize:16, color: pr.status==="merged" ? MC.purple : MC.green }}>{pr.status==="merged" ? "⏣" : "◉"}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:12, color:MC.text, fontWeight:500 }}><span style={{ color:MC.textMuted, fontFamily:MC.mono }}>#{pr.number}</span> {pr.title}</div>
-                    <div style={{ fontSize:10, color:MC.textMuted, marginTop:3, display:"flex", gap:8 }}><Tag color={MC.purple}>{pr.branch}</Tag><span>{pr.time}</span></div>
+              {prs.length === 0 && <div style={{ padding:"20px", color:MC.textMuted, textAlign:"center", fontSize:12 }}>PR なし</div>}
+              {prs.map(pr => {
+                const isMerged = pr.status === "merged";
+                const isClosed = pr.status === "closed";
+                const icon = isMerged ? "⏣" : isClosed ? "✕" : "◉";
+                const color = isMerged ? MC.purple : isClosed ? MC.textMuted : MC.green;
+                return (
+                  <div key={pr.number} style={{ display:"flex", alignItems:"flex-start", gap:10, padding:"10px 14px", borderBottom:`1px solid ${MC.border}08` }}>
+                    <span style={{ fontSize:16, color, marginTop:2 }}>{icon}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, color:MC.text, fontWeight:500 }}>
+                        <span style={{ color:MC.textMuted, fontFamily:MC.mono }}>#{pr.number}</span> {pr.title}
+                      </div>
+                      <div style={{ fontSize:10, color:MC.textMuted, marginTop:3, display:"flex", gap:8, flexWrap:"wrap" }}>
+                        <Tag color={MC.purple}>{pr.branch}</Tag>
+                        <span style={{ color: isMerged ? MC.purple : isClosed ? MC.textMuted : MC.green, fontWeight:600 }}>
+                          {isMerged ? "✅ マージ済み" : isClosed ? "⛔ クローズ" : "🔵 Open"}
+                        </span>
+                        {pr.checks && pr.checks !== "pending" && (
+                          <span style={{ color: pr.checks==="passed" ? MC.green : MC.red }}>CI: {pr.checks}</span>
+                        )}
+                        <span>{pr.time}</span>
+                      </div>
+                    </div>
                   </div>
-                  <CIBadge status={pr.status==="merged" ? "passed" : pr.checks} />
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Panel>
         )}

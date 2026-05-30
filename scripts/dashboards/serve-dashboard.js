@@ -701,6 +701,64 @@ let _ghCache   = null;
 let _ghCacheAt = 0;
 const GH_CACHE_TTL = 25000;
 
+// Per-project CI data cache — keyed by repoShortName
+const _projCiCache = new Map(); // key → { data, at }
+const PROJ_CI_TTL  = 30000;    // 30 seconds
+
+/** Fetch GitHub data for a specific repo (owner/repoName)
+ *  Uses current gh auth — no separate PAT required if gh is logged in. */
+async function fetchProjectCiData(repoFullName) {
+  const now = Date.now();
+  const cached = _projCiCache.get(repoFullName);
+  if (cached && now - cached.at < PROJ_CI_TTL) return cached.data;
+
+  const opts = { timeout: 8000, cwd: PROJ_ROOT };
+  const [runRes, prRes, issueRes] = await Promise.allSettled([
+    execAsync(`gh run list --repo ${repoFullName} --limit 8 --json databaseId,workflowName,status,conclusion,headBranch,headSha,updatedAt`, opts),
+    execAsync(`gh pr list  --repo ${repoFullName} --limit 8 --state all --json number,title,state,author,headRefName,createdAt,mergedAt,mergeCommit,statusCheckRollup`, opts),
+    execAsync(`gh issue list --repo ${repoFullName} --limit 8 --json number,title,labels,assignees,createdAt`, opts),
+  ]);
+
+  const ciWorkflows = runRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(runRes.value.stdout).map(r => ({
+        status:      r.conclusion || r.status || 'pending',
+        displayName: r.workflowName || r.name || '—',
+        branch:      r.headBranch  || 'main',
+        commit:      (r.headSha    || '').slice(0, 7),
+        duration:    '—',
+        time:        relTime(r.updatedAt),
+      })); } catch { return []; } })()
+    : [];
+
+  const recentPRs = prRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(prRes.value.stdout).map(p => ({
+        number: p.number,
+        title:  p.title,
+        branch: p.headRefName || '',
+        status: p.state === 'MERGED' ? 'merged' : p.state === 'CLOSED' ? 'closed' : 'open',
+        checks: (p.statusCheckRollup?.length > 0)
+                  ? (p.statusCheckRollup.every(c => c.conclusion === 'SUCCESS') ? 'passed' : 'failed')
+                  : 'pending',
+        mergedAt: p.mergedAt || null,
+        time:   relTime(p.mergedAt || p.createdAt),
+      })); } catch { return []; } })()
+    : [];
+
+  const openIssues = issueRes.status === 'fulfilled'
+    ? (() => { try { return JSON.parse(issueRes.value.stdout).map(i => ({
+        number:   i.number,
+        title:    i.title,
+        labels:   (i.labels || []).map(l => l.name).slice(0, 3),
+        assignee: (i.assignees || []).map(a => a.login).join(', ') || '未割り当て',
+        time:     relTime(i.createdAt),
+      })); } catch { return []; } })()
+    : [];
+
+  const data = { ciWorkflows, recentPRs, openIssues, repo: repoFullName, generated: new Date().toISOString() };
+  _projCiCache.set(repoFullName, { data, at: now });
+  return data;
+}
+
 async function fetchGhData() {
   const now = Date.now();
   if (_ghCache && now - _ghCacheAt < GH_CACHE_TTL) return _ghCache;
@@ -1515,6 +1573,27 @@ if (require.main === module) {
     }
     if (req.method === 'POST' && pn === '/api/jobs') { return handleJobRun(req, res); }
     if (pn === '/api/jobs/status')                    { return handleJobStatus(res); }
+    // Per-project GitHub CI data — GET /api/project-ci?repo=Kensan196948G/RepoName
+    if (pn === '/api/project-ci' && req.method === 'GET') {
+      const urlObj = new URL(req.url, 'http://localhost');
+      const repo   = urlObj.searchParams.get('repo') || '';
+      // Security: only allow format "owner/reponame" (alphanumeric + dash/underscore)
+      if (!/^[A-Za-z0-9_-]+\/[A-Za-z0-9_.-]+$/.test(repo)) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid repo format. Use owner/reponame' }));
+        return;
+      }
+      fetchProjectCiData(repo)
+        .then(data => {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' });
+          res.end(JSON.stringify(data, null, 2));
+        })
+        .catch(e => {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: e.message }));
+        });
+      return;
+    }
     if (pn === '/api/token' && req.method === 'GET')   {
       // Issue short-lived SSE token (requires Basic Auth; disabled when no password)
       const token = createSseToken();
