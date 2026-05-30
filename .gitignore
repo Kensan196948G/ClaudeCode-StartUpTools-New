@@ -141,6 +141,12 @@ scripts/claudeos-back/
 # Codex 個人設定（共有テンプレートは .codex/config.toml.example を参照）
 .codex/config.toml
 
+# Playwright テスト・スクリーンショット
+*.png
+*.jpeg
+*.jpg
+.playwright-mcp/
+
 # 認証・資格情報（絶対にコミットしない）
 .credentials.json
 **/credentials.json
