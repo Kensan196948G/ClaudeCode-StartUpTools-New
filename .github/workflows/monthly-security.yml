@@ -90,11 +90,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Read maintenance KPI from state.json
+      # state.json は .gitignore 対象で CI には存在しないため state.json.example へフォールバックする。
+      - name: Read maintenance KPI from state.json (fallback to state.json.example)
         run: |
           node -e "
           const fs = require('fs');
-          const data = JSON.parse(fs.readFileSync('state.json','utf8'));
+          const file = fs.existsSync('state.json') ? 'state.json' : 'state.json.example';
+          console.log('source:', file);
+          const data = JSON.parse(fs.readFileSync(file,'utf8'));
           const m = data.maintenance ?? {};
           console.log('=== Monthly KPI Report ===');
           console.log('phase_mode:', m.phase_mode ?? 'development');

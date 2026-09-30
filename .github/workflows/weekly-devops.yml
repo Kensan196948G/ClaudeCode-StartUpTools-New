@@ -62,19 +62,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Validate state.json
+      # state.json は実行時生成ファイルで .gitignore 対象（d290f09 で追跡解除）のため
+      # CI のチェックアウトには存在しない。存在すればそれを、無ければコミット済み
+      # テンプレート state.json.example を検証対象とする（parse 失敗は従来どおり exit 1）。
+      - name: Validate state.json (fallback to state.json.example)
         run: |
           node -e "
           const fs = require('fs');
+          const file = fs.existsSync('state.json') ? 'state.json' : 'state.json.example';
+          console.log('validating:', file);
           try {
-            const data = JSON.parse(fs.readFileSync('state.json','utf8'));
+            const data = JSON.parse(fs.readFileSync(file,'utf8'));
             const mode = data.maintenance?.phase_mode ?? 'development';
             console.log('phase_mode:', mode);
             console.log('execution.phase:', data.execution?.phase);
             console.log('stable_achieved:', data.stable?.stable_achieved);
             console.log('error_budget_remaining_pct:', data.maintenance?.error_budget_remaining_pct ?? 'N/A');
             console.log('open_incidents:', JSON.stringify(data.maintenance?.open_incidents ?? []));
-          } catch(e) { console.error('state.json parse error:', e.message); process.exit(1); }
+          } catch(e) { console.error(file + ' parse error:', e.message); process.exit(1); }
           "
 
       - name: Validate state.schema.json
